@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import numpy as np
 
 # Ρύθμιση σελίδας Streamlit σε wide mode
-st.set_page_config(page_title="3D Solid Geotechnical Model", layout="wide")
+st.set_page_config(page_title="3D Stratigraphic Model", layout="wide")
 
 st.title("📦 Real-Data Τρισδιάστατο (3D) Γεωτεχνικό Μοντέλο (0-450m)")
 st.write("Συμπαγής τρισδιάστατη απεικόνιση των εδαφικών στρώσεων με πάχος και επισήμανση του Υδροφόρου Ορίζοντα.")
@@ -31,58 +31,66 @@ if uploaded_file is not None:
         st.success("Το αρχείο φορτώθηκε επιτυχώς!")
         
         # Πραγματικά γεωλογικά δεδομένα από το φύλλο "Γεωτρήσεις"
-        x_points = [0, 80, 250, 350, 450]
-        z_water_pts = [-2.0, -2.0, -2.2, -1.8, -1.8]
-        z_layer1_pts = [-9.5, -9.5, -8.0, -11.5, -11.5]  
-        z_layer2_pts = [-21.0, -21.0, -20.0, -21.5, -21.5] 
-        z_bottom_pts = [-35.0, -35.0, -35.0, -35.0, -35.0] 
+        x_points = np.array([0, 80, 250, 350, 450])
+        z_water_pts = np.array([-2.0, -2.0, -2.2, -1.8, -1.8])
+        z_layer1_pts = np.array([-9.5, -9.5, -8.0, -11.5, -11.5])  
+        z_layer2_pts = np.array([-21.0, -21.0, -20.0, -21.5, -21.5]) 
+        z_bottom_pts = np.array([-35.0, -35.0, -35.0, -35.0, -35.0]) 
+
+        # Δημιουργία πυκνού πλέγματος (Grid) για να γεμίσουν οι όγκοι
+        x_space = np.linspace(0, 450, 30)
+        y_space = np.linspace(-10, 10, 5)
+        X_grid, Y_grid = np.meshgrid(x_space, y_space)
+        
+        # Παρεμβολή των πραγματικών ορίων σε όλο το Grid
+        Z_surface = np.zeros_like(X_grid)
+        Z_water = np.tile(np.interp(x_space, x_points, z_water_pts), (len(y_space), 1))
+        Z_layer1 = np.tile(np.interp(x_space, x_points, z_layer1_pts), (len(y_space), 1))
+        Z_layer2 = np.tile(np.interp(x_space, x_points, z_layer2_pts), (len(y_space), 1))
+        Z_bottom = np.tile(np.interp(x_space, x_points, z_bottom_pts), (len(y_space), 1))
 
         fig_3d = go.Figure()
         
-        # --- ΔΗΜΙΟΥΡΓΙΑ ΣΥΜΠΑΓΩΝ ΣΤΡΩΣΕΩΝ ΜΕ MESH3D ---
-        # Ορίζουμε τις 4 γωνίες κάθε στρώματος για να δημιουργήσουμε το "τοιχίο" (Cross-section με πλάτος)
-        # Στρώση 1: Μαλακή Άργιλος / Ιλύς (Από Z=0 έως τη βάση της 1ης στρώσης)
-        x_s1 = x_points + x_points[::-1]
-        y_s1 = [-5]*5 + [5]*5
-        z_s1_top = [0, 0, 0, 0, 0] + [0, 0, 0, 0, 0]
-        z_s1_bot = z_layer1_pts + z_layer1_pts[::-1]
+        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΣΥΜΠΑΓΗ ΣΩΜΑΤΑ (SURFACE FILL) ---
         
-        fig_3d.add_trace(go.Mesh3d(
-            x=x_points + x_points,
-            y=[-5]*5 + [5]*5,
-            z=z_layer1_pts + [0]*5,
-            color='rgba(210, 180, 140, 0.7)',
-            name='Μαλακή Άργιλος / Ιλύς (CL/ML)',
-            showlegend=True
+        # Στρώση 1: Μαλακή Άργιλος / Ιλύς (Από 0 έως Z_layer1)
+        fig_3d.add_trace(go.Surface(
+            x=X_grid, y=Y_grid, z=Z_layer1,
+            surfacecolor=np.ones_like(X_grid) * 1,
+            colorscale=[[0, '#d2b48c'], [1, '#d2b48c']],
+            showscale=False, name='Μαλακή Άργιλος / Ιλύς (CL/ML)'
+        ))
+        fig_3d.add_trace(go.Surface(
+            x=X_grid, y=Y_grid, z=Z_surface,
+            surfacecolor=np.ones_like(X_grid) * 1,
+            colorscale=[[0, '#d2b48c'], [1, '#d2b48c']],
+            showscale=False, name='Μαλακή Άργιλος / Ιλύς (CL/ML)'
         ))
         
-        # Στρώση 2: Συμπιεστή Άργιλος (Από τη βάση της 1ης έως τη βάση της 2ης)
-        fig_3d.add_trace(go.Mesh3d(
-            x=x_points + x_points,
-            y=[-5]*5 + [5]*5,
-            z=z_layer2_pts + z_layer1_pts,
-            color='rgba(240, 230, 140, 0.7)',
-            name='Συμπιεστή Άργιλος (CH/MH)',
-            showlegend=True
+        # Στρώση 2: Συμπιεστή Άργιλος (Από Z_layer1 έως Z_layer2)
+        fig_3d.add_trace(go.Surface(
+            x=X_grid, y=Y_grid, z=Z_layer2,
+            surfacecolor=np.ones_like(X_grid) * 2,
+            colorscale=[[0, '#ebdca5'], [1, '#ebdca5']],
+            showscale=False, name='Συμπιεστή Άργιλος (CH/MH)'
         ))
         
-        # Στρώση 3: Σκληρή Μάργα (Από τη βάση της 2ης έως τον πυθμένα στα -35m)
-        fig_3d.add_trace(go.Mesh3d(
-            x=x_points + x_points,
-            y=[-5]*5 + [5]*5,
-            z=z_bottom_pts + z_layer2_pts,
-            color='rgba(169, 169, 169, 0.7)',
-            name='Σκλήρη Μάργα (Stiff Marl)',
-            showlegend=True
+        # Στρώση 3: Σκληρή Μάργα (Από Z_layer2 έως τον Πυθμένα)
+        fig_3d.add_trace(go.Surface(
+            x=X_grid, y=Y_grid, z=Z_bottom,
+            surfacecolor=np.ones_like(X_grid) * 3,
+            colorscale=[[0, '#a9a9a9'], [1, '#a9a9a9']],
+            showscale=False, name='Σκλήρη Μάργα (Stiff Marl)'
         ))
 
-        # --- ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ ΩΣ ΜΠΛΕ ΓΡΑΜΜΗ ΜΕ ΚΑΘΑΡΗ ΤΑΜΠΕΛΑ ---
+        # --- ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ (Ως μπλε έντονη γραμμή με κλίση ανά γεώτρηση) ---
         fig_3d.add_trace(go.Scatter3d(
             x=x_points,
             y=[0]*5,
             z=z_water_pts,
-            mode='lines+text',
-            line=dict(color='rgb(0, 120, 255)', width=8),
+            mode='lines+markers+text',
+            line=dict(color='rgb(0, 120, 255)', width=10),
+            marker=dict(size=6, color='blue'),
             name='Υδροφόρος Ορίζοντας',
             text=["", "", "💧 ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ", "", ""], 
             textposition="top center",
@@ -101,7 +109,7 @@ if uploaded_file is not None:
             fig_3d.add_trace(go.Scatter3d(
                 x=[x_pos, x_pos], y=[0, 0], z=[0, -max_depth],
                 mode='lines+markers+text',
-                line=dict(color='black', width=6),
+                line=dict(color='black', width=7),
                 marker=dict(size=5, color='darkred'),
                 text=[str(test_id), ""],
                 textposition="top center",
@@ -114,9 +122,10 @@ if uploaded_file is not None:
                 xaxis=dict(title='Μήκος Χ (m)', range=[0, 450]),
                 yaxis=dict(title='Πλάτος Υ (m)', range=[-10, 10]),
                 zaxis=dict(title='Βάθος Ζ (m)', range=[-35, 5]),
-                aspectratio=dict(x=3, y=1, z=1.2)
+                # ΣΗΜΑΝΤΙΚΟ: Αυξάνουμε το z στο aspectratio (π.χ. από 1 σε 2) για να φαίνονται πεντακάθαρα οι κλίσεις!
+                aspectratio=dict(x=3, y=1, z=2)
             ),
-            height=650,
+            height=700,
             margin=dict(r=10, l=10, b=10, t=10),
             legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
         )
