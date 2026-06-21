@@ -17,10 +17,11 @@ if uploaded_file is not None:
         # Ανάγνωση των δεδομένων
         df = pd.read_excel(uploaded_file)
         
-        # Καθαρισμός στηλών από κενά
+        # Καθαρισμός στηλών μόνο από κενά δεξιά-αριστερά
         for col in df.columns:
             df = df.rename(columns={col: col.strip()})
             
+        # Εξασφάλιση ότι οι βασικοί αριθμητικοί άξονες μετατρέπονται σωστά
         fixed_cols = ['X-coordination', 'Depth', 'N-corrected', 'Su(from SPT)', 'Vs', 'Su ( from Vs )', 'CPT-qc', 'Su ( from CPT-qc)']
         for col in fixed_cols:
             if col in df.columns:
@@ -31,7 +32,6 @@ if uploaded_file is not None:
         st.success("Το αρχείο φορτώθηκε επιτυχώς!")
         
         # Πραγματικά γεωλογικά δεδομένα και νέα ύψη υδροφόρου ανά γεώτρηση
-        # Θέσεις Χ: ΝΓ1=80m, Γ1=180m, ΓΕ1=250m, ΝΓ2=350m (με προσθήκη των άκρων 0m και 450m)
         x_points = np.array([0, 80, 180, 250, 350, 450])
         z_water_pts = np.array([-1.20, -1.20, -0.30, -0.90, -0.60, -0.60]) 
         
@@ -45,7 +45,7 @@ if uploaded_file is not None:
         y_space = np.linspace(-10, 10, 5)
         X_grid, Y_grid = np.meshgrid(x_space, y_space)
         
-        # Παρεμβολή (Interpolation) για να ενωθούν ομαλά όλα τα ενδιάμεσα κενά
+        # Παρεμβολή (Interpolation)
         Z_surface = np.zeros_like(X_grid)
         Z_water = np.tile(np.interp(x_space, x_points, z_water_pts), (len(y_space), 1))
         Z_layer1 = np.tile(np.interp(x_space, x_points, z_layer1_pts), (len(y_space), 1))
@@ -54,7 +54,8 @@ if uploaded_file is not None:
 
         fig_3d = go.Figure()
         
-        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΗΜΙΔΙΑΦΑΝΟΙ ΣΥΜΠΑΓΕΙΣ ΟΓΚΟΥΣ (ΧΩΡΙΣ ΚΕΝΑ) ---
+        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΗΜΙΔΙΑΦΑΝΟΙ ΣΥΜΠΑΓΕΙΣ ΟΓΚΟΥΣ ---
+        # Χρήση bool() για να αποφευχθεί το σφάλμα np.True_
         
         # Στρώση 1: Μαλακή Άργιλος / Ιλύς (Από 0m έως τη βάση της 1ης στρώσης)
         for offset in np.linspace(0, 1, 6):
@@ -62,7 +63,7 @@ if uploaded_file is not None:
             fig_3d.add_trace(go.Surface(
                 x=X_grid, y=Y_grid, z=Z_fill,
                 colorscale=[[0, '#d2b48c'], [1, '#d2b48c']], opacity=0.35, showscale=False,
-                name='Μαλακή Άργιλος / Ιλύς (CL/ML)', legendgroup='g1', showlegend=(offset==0)
+                name='Μαλακή Άργιλος / Ιλύς (CL/ML)', legendgroup='g1', showlegend=bool(offset==0)
             ))
         
         # Στρώση 2: Συμπιεστή Άργιλος (Από τη βάση της 1ης έως τη βάση της 2ης)
@@ -71,7 +72,7 @@ if uploaded_file is not None:
             fig_3d.add_trace(go.Surface(
                 x=X_grid, y=Y_grid, z=Z_fill,
                 colorscale=[[0, '#ebdca5'], [1, '#ebdca5']], opacity=0.35, showscale=False,
-                name='Συμπιεστή Άργιλος (CH/MH)', legendgroup='g2', showlegend=(offset==0)
+                name='Συμπιεστή Άργιλος (CH/MH)', legendgroup='g2', showlegend=bool(offset==0)
             ))
         
         # Στρώση 3: Σκληρή Μάργα (Από τη βάση της 2ης έως τον πυθμένα στα -35m)
@@ -80,10 +81,10 @@ if uploaded_file is not None:
             fig_3d.add_trace(go.Surface(
                 x=X_grid, y=Y_grid, z=Z_fill,
                 colorscale=[[0, '#a9a9a9'], [1, '#a9a9a9']], opacity=0.35, showscale=False,
-                name='Σκλήρη Μάργα (Stiff Marl)', legendgroup='g3', showlegend=(offset==0)
+                name='Σκλήρη Μάργα (Stiff Marl)', legendgroup='g3', showlegend=bool(offset==0)
             ))
 
-        # --- ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ (Με διορθωμένους άξονες ίσου μήκους = 4 στοιχεία) ---
+        # --- ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ ---
         fig_3d.add_trace(go.Scatter3d(
             x=[80, 180, 250, 350], 
             y=[0, 0, 0, 0],
@@ -102,18 +103,18 @@ if uploaded_file is not None:
         unique_tests = df_clean[['Test ID', 'X-coordination']].drop_duplicates()
         
         for idx, row in unique_tests.iterrows():
-            test_id = row['Test ID']
+            t_id = row['Test ID']
             x_pos = row['X-coordination']
-            max_depth = df[df['Test ID'] == test_id]['Depth'].max()
+            max_depth = df[df['Test ID'] == t_id]['Depth'].max()
             
             fig_3d.add_trace(go.Scatter3d(
                 x=[x_pos, x_pos], y=[0, 0], z=[0, -max_depth],
                 mode='lines+markers+text',
                 line=dict(color='black', width=8),
                 marker=dict(size=6, color='darkred'),
-                text=[str(test_id), ""],
+                text=[str(t_id), ""],
                 textposition="top center",
-                name=str(test_id),
+                name=str(t_id),
                 showlegend=False
             ))
             
@@ -154,6 +155,7 @@ if uploaded_file is not None:
                 fig_su.add_trace(go.Scatter(x=test_data['Su ( from Vs )'], y=-test_data['Depth'], mode='lines+markers', name='Su (Vs)', line=dict(color='purple', dash='dash')))
             if 'Su ( from CPT-qc)' in test_data.columns and test_data['Su ( from CPT-qc)'].notna().any():
                 fig_su.add_trace(go.Scatter(x=test_data['Su ( from CPT-qc)'], y=-test_data['Depth'], mode='lines+markers', name='Su (CPT)', line=dict(color='red')))
+                
             fig_su.update_layout(title=f"Su - {selected_test}", xaxis=dict(title="Su (kPa)"), yaxis=dict(title="Βάθος (m)"), template="plotly_white")
             st.plotly_chart(fig_su, use_container_width=True)
             
