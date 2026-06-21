@@ -7,17 +7,24 @@ import numpy as np
 st.set_page_config(page_title="3D Γεωτεχνικό Μοντέλο Έργου", layout="wide")
 
 st.title("📦 Τρισδιάστατο (3D) Γεωτεχνικό Μοντέλο & Μηκοτομή Έργου (0-450m)")
-st.write("Αναπτύχθηκε για τη συνδυαστική αξιολόγηση και οπτικοποίηση δεδομένων SPT, CPT και MASW κατά μήκος της χάραξης.")
+st.write("Αναπτυχθηκε για τη συνδυαστικη αξιολογηση και οπτικοποιηση δεδομενων SPT, CPT και MASW κατα μηκος της χαραξης.")
 
 # 1. Εισαγωγή Αρχείου Excel
 uploaded_file = st.file_uploader("📂 Ανεβάστε το τελικό αρχείο Excel (.xlsx)", type=["xlsx"])
 
 if uploaded_file is not None:
     try:
-        # Ανάγνωση των δεδομένων από το Excel
-        df = pd.read_excel(uploaded_file)
+        # Ανάγνωση των δεδομένων από το Excel (διαβάζει όλες τις στήλες ως κείμενο αρχικά για να διορθώσει τα κόμματα)
+        df = pd.read_excel(uploaded_file, dtype=str)
         
-        st.success("Το αρχείο φορτώθηκε επιτυχώς!")
+        # Αντικατάσταση του κόμματος με τελεία για τους δεκαδικούς αριθμούς και μετατροπή σε αριθμητικά δεδομένα
+        cols_to_convert = ['X-coordination', 'Depth', 'N-corrected', 'Su(from SPT)', 'Vs', 'Su(from Vs)', 'CPT-qc', 'Su(from CPT-qc)']
+        for col in cols_to_convert:
+            if col in df.columns:
+                df[col] = df[col].str.replace(',', '.', regex=False)
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        st.success("Το αρχείο φορτώθηκε και επεξεργάστηκε επιτυχώς!")
         
         # Προεπισκόπηση του πίνακα δεδομένων
         with st.expander("🔍 Προεπισκόπηση Πίνακα Δεδομένων Excel"):
@@ -56,16 +63,19 @@ if uploaded_file is not None:
             showscale=False, name='Σκλήρη Μάργα (Stiff Marl)'
         ))
         
-        # Εύρεση των μοναδικών δοκιμών (Test_ID) και των θέσεών τους (X_coord)
-        unique_tests = df[['Test_ID', 'X_coord']].drop_duplicates()
+        # Εύρεση των μοναδικών δοκιμών (Test ID) και των θέσεών τους (X-coordination)
+        df_clean = df.dropna(subset=['Test ID', 'X-coordination'])
+        unique_tests = df_clean[['Test ID', 'X-coordination']].drop_duplicates()
         
         # Τοποθέτηση των δοκιμών/γεωτρήσεων ως 3D κατακόρυφοι "πάσσαλοι"
         for idx, row in unique_tests.iterrows():
-            test_id = row['Test_ID']
-            x_pos = row['X_coord']
+            test_id = row['Test ID']
+            x_pos = row['X-coordination']
             
             # Εύρεση του μέγιστου βάθους της συγκεκριμένης δοκιμής
-            max_depth = df[df['Test_ID'] == test_id]['Depth'].max()
+            max_depth = df[df['Test ID'] == test_id]['Depth'].max()
+            if np.isnan(max_depth):
+                max_depth = 20.0  # Default βάθος αν δεν βρεθεί τιμή
             
             fig_3d.add_trace(go.Scatter3d(
                 x=[x_pos, x_pos], y=[0, 0], z=[0, -max_depth],
@@ -83,7 +93,7 @@ if uploaded_file is not None:
                 xaxis=dict(title='Μήκος Χ (m)', range=[0, 450]),
                 yaxis=dict(title='Πλάτος Υ (m)', range=[-20, 20]),
                 zaxis=dict(title='Βάθος Ζ (m)', range=[-35, 2]),
-                aspectratio=dict(x=3, y=1, z=1) # Παραμόρφωση άξονα Χ για να φαίνεται σωστά το μεγάλο μήκος
+                aspectratio=dict(x=3, y=1, z=1)
             ),
             height=600,
             margin=dict(r=10, l=10, b=10, t=10)
@@ -96,10 +106,10 @@ if uploaded_file is not None:
         st.subheader("📈 Συγκριτικά Προφίλ Ιδιοτήτων με το Βάθος")
         
         # Dropdown μενού για να επιλέγει ο χρήστης ποιο σημείο θέλει να μελετήσει
-        selected_test = st.selectbox("🎯 Επιλέξτε Γεώτρηση, CPT ή MASW για προβολή των διαγραμμάτων του:", df['Test_ID'].unique())
+        selected_test = st.selectbox("🎯 Επιλέξτε Γεώτρηση ή Δοκιμή για προβολή των διαγραμμάτων της:", df['Test ID'].dropna().unique())
         
         # Φιλτράρισμα δεδομένων για την επιλεγμένη δοκιμή
-        test_data = df[df['Test_ID'] == selected_test].sort_values(by='Depth')
+        test_data = df[df['Test ID'] == selected_test].sort_values(by='Depth')
         
         # Δημιουργία 2 στηλών στην οθόνη για τα 2 παράλληλα γραφήματα
         col1, col2 = st.columns(2)
@@ -108,17 +118,11 @@ if uploaded_file is not None:
             # Γράφημα Α: Προφίλ Ταχυτήτων Vs
             fig_vs = go.Figure()
             
-            # Έλεγχος και σχεδιασμός Vs από MASW
-            if 'Vs_MASW' in test_data.columns and test_data['Vs_MASW'].notna().any():
+            # Σχεδιασμός Vs
+            if 'Vs' in test_data.columns and test_data['Vs'].notna().any():
                 fig_vs.add_trace(go.Scatter(
-                    x=test_data['Vs_MASW'], y=-test_data['Depth'],
-                    mode='lines+markers', name='Vs (MASW)', line=dict(color='blue', width=2)
-                ))
-            # Έλεγχος και σχεδιασμός Vs από CPT (εμπειρικό)
-            if 'Vs_from_CPT' in test_data.columns and test_data['Vs_from_CPT'].notna().any():
-                fig_vs.add_trace(go.Scatter(
-                    x=test_data['Vs_from_CPT'], y=-test_data['Depth'],
-                    mode='lines+markers', name='Vs (από CPT)', line=dict(color='orange', width=2, dash='dot')
+                    x=test_data['Vs'], y=-test_data['Depth'],
+                    mode='lines+markers', name='Ταχύτητα Vs (m/s)', line=dict(color='blue', width=2)
                 ))
                 
             fig_vs.update_layout(
@@ -135,22 +139,22 @@ if uploaded_file is not None:
             fig_su = go.Figure()
             
             # Έλεγχος και σχεδιασμός Su από SPT
-            if 'Su_from_SPT' in test_data.columns and test_data['Su_from_SPT'].notna().any():
+            if 'Su(from SPT)' in test_data.columns and test_data['Su(from SPT)'].notna().any():
                 fig_su.add_trace(go.Scatter(
-                    x=test_data['Su_from_SPT'], y=-test_data['Depth'],
+                    x=test_data['Su(from SPT)'], y=-test_data['Depth'],
                     mode='lines+markers', name='Su (από SPT)', line=dict(color='green', width=2)
                 ))
-            # Έλεγχος και σχεδιασμός Su από CPT
-            if 'Su_from_CPT' in test_data.columns and test_data['Su_from_CPT'].notna().any():
-                fig_su.add_trace(go.Scatter(
-                    x=test_data['Su_from_CPT'], y=-test_data['Depth'],
-                    mode='lines+markers', name='Su (από CPT)', line=dict(color='red', width=2)
-                ))
             # Έλεγχος και σχεδιασμός Su από Vs
-            if 'Su_from_Vs' in test_data.columns and test_data['Su_from_Vs'].notna().any():
+            if 'Su(from Vs)' in test_data.columns and test_data['Su(from Vs)'].notna().any():
                 fig_su.add_trace(go.Scatter(
-                    x=test_data['Su_from_Vs'], y=-test_data['Depth'],
+                    x=test_data['Su(from Vs)'], y=-test_data['Depth'],
                     mode='lines+markers', name='Su (από Vs)', line=dict(color='purple', width=2, dash='dash')
+                ))
+            # Έλεγχος και σχεδιασμός Su από CPT-qc
+            if 'Su(from CPT-qc)' in test_data.columns and test_data['Su(from CPT-qc)'].notna().any():
+                fig_su.add_trace(go.Scatter(
+                    x=test_data['Su(from CPT-qc)'], y=-test_data['Depth'],
+                    mode='lines+markers', name='Su (από CPT)', line=dict(color='red', width=2)
                 ))
                 
             fig_su.update_layout(
@@ -164,6 +168,5 @@ if uploaded_file is not None:
             
     except Exception as e:
         st.error(f"⚠️ Παρουσιάστηκε σφάλμα κατά την επεξεργασία του αρχείου: {e}")
-        st.info("Σιγουρευτείτε ότι οι στήλες στο Excel έχουν ακριβώς τα ονόματα: Test_ID, X_coord, Depth, Vs_MASW, Vs_from_CPT, Su_from_SPT, Su_from_CPT, Su_from_Vs")
 else:
     st.info("💡 Η εφαρμογή είναι έτοιμη. Ανεβάστε το τελικό αρχείο Excel (.xlsx) για να δημιουργηθεί το 3D μοντέλο και τα προφίλ βάθους.")
