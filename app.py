@@ -7,7 +7,7 @@ import numpy as np
 st.set_page_config(page_title="3D Stratigraphic Model", layout="wide")
 
 st.title("📦 Real-Data Τρισδιάστατο (3D) Γεωτεχνικό Μοντέλο (0-450m)")
-st.write("Συμπαγής τρισδιάστατη απεικόνιση των εδαφικών στρώσεων με πάχος και επισήμανση του Υδροφόρου Ορίζοντα.")
+st.write("Συμπαγής και ημιδιάφανη απεικόνιση των εδαφικών στρώσεων με τις πραγματικές κλίσεις του Υδροφόρου Ορίζοντα.")
 
 # 1. Εισαγωγή Αρχείου Excel
 uploaded_file = st.file_uploader("📂 Ανεβάστε το τελικό αρχείο Excel (.xlsx)", type=["xlsx"])
@@ -30,19 +30,22 @@ if uploaded_file is not None:
         
         st.success("Το αρχείο φορτώθηκε επιτυχώς!")
         
-        # Πραγματικά γεωλογικά δεδομένα από το φύλλο "Γεωτρήσεις"
-        x_points = np.array([0, 80, 250, 350, 450])
-        z_water_pts = np.array([-2.0, -2.0, -2.2, -1.8, -1.8])
-        z_layer1_pts = np.array([-9.5, -9.5, -8.0, -11.5, -11.5])  
-        z_layer2_pts = np.array([-21.0, -21.0, -20.0, -21.5, -21.5]) 
-        z_bottom_pts = np.array([-35.0, -35.0, -35.0, -35.0, -35.0]) 
+        # Πραγματικά γεωλογικά δεδομένα και νέα ύψη υδροφόρου ανά γεώτρηση
+        # Θέσεις Χ: ΝΓ1=80m, Γ1=180m, ΓΕ1=250m, ΝΓ2=350m (με προσθήκη των άκρων 0m και 450m)
+        x_points = np.array([0, 80, 180, 250, 350, 450])
+        z_water_pts = np.array([-1.20, -1.20, -0.30, -0.90, -0.60, -0.60]) # Τα πραγματικά σου υψόμετρα
+        
+        # Όρια στρώσεων βάσει των γεωτρήσεων
+        z_layer1_pts = np.array([-9.5, -9.5, -8.5, -8.0, -11.5, -11.5])  
+        z_layer2_pts = np.array([-21.0, -21.0, -20.5, -20.0, -21.5, -21.5]) 
+        z_bottom_pts = np.array([-35.0, -35.0, -35.0, -35.0, -35.0, -35.0]) 
 
-        # Δημιουργία πυκνού πλέγματος (Grid) για να γεμίσουν οι όγκοι
-        x_space = np.linspace(0, 450, 30)
+        # Δημιουργία πυκνού 3D Grid για τέλειο γέμισμα των όγκων
+        x_space = np.linspace(0, 450, 40)
         y_space = np.linspace(-10, 10, 5)
         X_grid, Y_grid = np.meshgrid(x_space, y_space)
         
-        # Παρεμβολή των πραγματικών ορίων σε όλο το Grid
+        # Παρεμβολή (Interpolation) για να ενωθούν ομαλά όλα τα ενδιάμεσα κενά
         Z_surface = np.zeros_like(X_grid)
         Z_water = np.tile(np.interp(x_space, x_points, z_water_pts), (len(y_space), 1))
         Z_layer1 = np.tile(np.interp(x_space, x_points, z_layer1_pts), (len(y_space), 1))
@@ -51,53 +54,51 @@ if uploaded_file is not None:
 
         fig_3d = go.Figure()
         
-        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΣΥΜΠΑΓΗ ΣΩΜΑΤΑ (SURFACE FILL) ---
+        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΗΜΙΔΙΑΦΑΝΟΙ ΣΥΜΠΑΓΕΙΣ ΟΓΚΟΥΣ (ΧΩΡΙΣ ΚΕΝΑ) ---
+        # Χρησιμοποιούμε πολλαπλές ενδιάμεσες επιφάνειες για να "γεμίσει" το κενό εσωτερικά
         
-        # Στρώση 1: Μαλακή Άργιλος / Ιλύς (Από 0 έως Z_layer1)
-        fig_3d.add_trace(go.Surface(
-            x=X_grid, y=Y_grid, z=Z_layer1,
-            surfacecolor=np.ones_like(X_grid) * 1,
-            colorscale=[[0, '#d2b48c'], [1, '#d2b48c']],
-            showscale=False, name='Μαλακή Άργιλος / Ιλύς (CL/ML)'
-        ))
-        fig_3d.add_trace(go.Surface(
-            x=X_grid, y=Y_grid, z=Z_surface,
-            surfacecolor=np.ones_like(X_grid) * 1,
-            colorscale=[[0, '#d2b48c'], [1, '#d2b48c']],
-            showscale=False, name='Μαλακή Άργιλος / Ιλύς (CL/ML)'
-        ))
+        # Στρώση 1: Μαλακή Άργιλος / Ιλύς (Από 0m έως τη βάση της 1ης στρώσης)
+        for offset in np.linspace(0, 1, 6):
+            Z_fill = Z_surface * (1 - offset) + Z_layer1 * offset
+            fig_3d.add_trace(go.Surface(
+                x=X_grid, y=Y_grid, z=Z_fill,
+                colorscale=[[0, '#d2b48c'], [1, '#d2b48c']], opacity=0.35, showscale=False,
+                name='Μαλακή Άργιλος / Ιλύς (CL/ML)', legendgroup='g1', showlegend=(offset==0)
+            ))
         
-        # Στρώση 2: Συμπιεστή Άργιλος (Από Z_layer1 έως Z_layer2)
-        fig_3d.add_trace(go.Surface(
-            x=X_grid, y=Y_grid, z=Z_layer2,
-            surfacecolor=np.ones_like(X_grid) * 2,
-            colorscale=[[0, '#ebdca5'], [1, '#ebdca5']],
-            showscale=False, name='Συμπιεστή Άργιλος (CH/MH)'
-        ))
+        # Στρώση 2: Συμπιεστή Άργιλος (Από τη βάση της 1ης έως τη βάση της 2ης)
+        for offset in np.linspace(0, 1, 6):
+            Z_fill = Z_layer1 * (1 - offset) + Z_layer2 * offset
+            fig_3d.add_trace(go.Surface(
+                x=X_grid, y=Y_grid, z=Z_fill,
+                colorscale=[[0, '#ebdca5'], [1, '#ebdca5']], opacity=0.35, showscale=False,
+                name='Συμπιεστή Άργιλος (CH/MH)', legendgroup='g2', showlegend=(offset==0)
+            ))
         
-        # Στρώση 3: Σκληρή Μάργα (Από Z_layer2 έως τον Πυθμένα)
-        fig_3d.add_trace(go.Surface(
-            x=X_grid, y=Y_grid, z=Z_bottom,
-            surfacecolor=np.ones_like(X_grid) * 3,
-            colorscale=[[0, '#a9a9a9'], [1, '#a9a9a9']],
-            showscale=False, name='Σκλήρη Μάργα (Stiff Marl)'
-        ))
+        # Στρώση 3: Σκληρή Μάργα (Από τη βάση της 2ης έως τον πυθμένα στα -35m)
+        for offset in np.linspace(0, 1, 6):
+            Z_fill = Z_layer2 * (1 - offset) + Z_bottom * offset
+            fig_3d.add_trace(go.Surface(
+                x=X_grid, y=Y_grid, z=Z_fill,
+                colorscale=[[0, '#a9a9a9'], [1, '#a9a9a9']], opacity=0.35, showscale=False,
+                name='Σκλήρη Μάργα (Stiff Marl)', legendgroup='g3', showlegend=(offset==0)
+            ))
 
-        # --- ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ (Ως μπλε έντονη γραμμή με κλίση ανά γεώτρηση) ---
+        # --- ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ (Ως παχιά, έντονη μπλε 3D γραμμή με τα πραγματικά ύψη) ---
         fig_3d.add_trace(go.Scatter3d(
-            x=x_points,
-            y=[0]*5,
-            z=z_water_pts,
+            x=x_points[1:-1], # Σχεδίαση μόνο στα σημεία των πραγματικών γεωτρήσεων
+            y=[0]*4,
+            z=z_water_pts[1:-1],
             mode='lines+markers+text',
-            line=dict(color='rgb(0, 120, 255)', width=10),
-            marker=dict(size=6, color='blue'),
+            line=dict(color='rgb(0, 80, 255)', width=12),
+            marker=dict(size=8, color='darkblue', symbol='diamond'),
             name='Υδροφόρος Ορίζοντας',
-            text=["", "", "💧 ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ", "", ""], 
+            text=["", "💧 ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ", "", ""], 
             textposition="top center",
-            textfont=dict(size=14, color="blue")
+            textfont=dict(size=15, color="darkblue")
         ))
         
-        # Σχεδιασμός Κατακόρυφων Γεωτρήσεων
+        # Σχεδιασμός Κατακόρυφων Γεωτρήσεων (Φαίνονται τέλεια λόγω της διαφάνειας του εδάφους)
         df_clean = df.dropna(subset=['Test ID', 'X-coordination'])
         unique_tests = df_clean[['Test ID', 'X-coordination']].drop_duplicates()
         
@@ -109,8 +110,8 @@ if uploaded_file is not None:
             fig_3d.add_trace(go.Scatter3d(
                 x=[x_pos, x_pos], y=[0, 0], z=[0, -max_depth],
                 mode='lines+markers+text',
-                line=dict(color='black', width=7),
-                marker=dict(size=5, color='darkred'),
+                line=dict(color='black', width=8),
+                marker=dict(size=6, color='darkred'),
                 text=[str(test_id), ""],
                 textposition="top center",
                 name=str(test_id),
@@ -122,15 +123,15 @@ if uploaded_file is not None:
                 xaxis=dict(title='Μήκος Χ (m)', range=[0, 450]),
                 yaxis=dict(title='Πλάτος Υ (m)', range=[-10, 10]),
                 zaxis=dict(title='Βάθος Ζ (m)', range=[-35, 5]),
-                # ΣΗΜΑΝΤΙΚΟ: Αυξάνουμε το z στο aspectratio (π.χ. από 1 σε 2) για να φαίνονται πεντακάθαρα οι κλίσεις!
-                aspectratio=dict(x=3, y=1, z=2)
+                # 3D Υπερύψωση για να είναι πεντακάθαρη η διακύμανση του υδροφόρου
+                aspectratio=dict(x=3, y=1, z=2.2)
             ),
             height=700,
             margin=dict(r=10, l=10, b=10, t=10),
             legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
         )
         
-        st.subheader("📦 Τρισδιάστατη Γεωτεχνική Μηκοτομή (Solid Layers)")
+        st.subheader("📦 Τρισδιάστατο Συμπαγές & Διαφανές Μοντέλο")
         st.plotly_chart(fig_3d, use_container_width=True)
         
         # 3. 2D Διαγράμματα
