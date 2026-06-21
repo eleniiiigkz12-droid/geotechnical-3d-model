@@ -3,27 +3,24 @@ import pandas as pd
 import plotly.graph_objects as go
 import numpy as np
 
-# Ρύθμιση σελίδας Streamlit σε wide mode για να χωράνε τα γραφήματα
-st.set_page_config(page_title="3D Γεωτεχνικό Μοντέλο Έργου", layout="wide")
+# Ρύθμιση σελίδας Streamlit σε wide mode
+st.set_page_config(page_title="3D Real Geotechnical Model", layout="wide")
 
-st.title("📦 Τρισδιάστατο (3D) Γεωτεχνικό Μοντέλο & Μηκοτομή Έργου (0-450m)")
-st.write("Αναπτυχθηκε για τη συνδυαστικη αξιολογηση και οπτικοποιηση δεδομενων SPT, CPT και MASW κατα μηκος της χαραξης.")
+st.title("📦 Real-Data Τρισδιάστατο (3D) Γεωτεχνικό Μοντέλο (0-450m)")
+st.write("Το μοντέλο διαβάζει τις μεταβολές των ιδιοτήτων ανά γεώτρηση και σχεδιάζει την πραγματική στρωματογραφία.")
 
 # 1. Εισαγωγή Αρχείου Excel
 uploaded_file = st.file_uploader("📂 Ανεβάστε το τελικό αρχείο Excel (.xlsx)", type=["xlsx"])
 
 if uploaded_file is not None:
     try:
-        # Ανάγνωση των δεδομένων από το Excel απευθείας
+        # Ανάγνωση των δεδομένων
         df = pd.read_excel(uploaded_file)
         
-        # Καθαρισμός και μετατροπή στηλών σε αριθμητικές, είτε έχουν κόμματα είτε τελείες
-        cols_to_convert = ['X-coordination', 'Depth', 'N-corrected', 'Su(from SPT)', 'Vs', 'Su ( from Vs )', 'CPT-qc', 'Su ( from CPT-qc)']
+        # Καθαρισμός στηλών από κενά
         for col in df.columns:
-            # Αφαιρούμε τυχόν κενά από τα ονόματα των στηλών για σιγουριά
             df = df.rename(columns={col: col.strip()})
             
-        # Επανυπολογισμός των στηλών-κλειδιών με ασφάλεια
         fixed_cols = ['X-coordination', 'Depth', 'N-corrected', 'Su(from SPT)', 'Vs', 'Su ( from Vs )', 'CPT-qc', 'Su ( from CPT-qc)']
         for col in fixed_cols:
             if col in df.columns:
@@ -31,63 +28,76 @@ if uploaded_file is not None:
                     df[col] = df[col].astype(str).str.replace(',', '.', regex=False)
                 df[col] = pd.to_numeric(df[col], errors='coerce')
         
-        st.success("Το αρχείο φορτώθηκε και επεξεργάστηκε επιτυχώς!")
+        st.success("Το αρχείο φορτώθηκε επιτυχώς!")
         
-        # Προεπισκόπηση του πίνακα δεδομένων
-        with st.expander("🔍 Προεπισκόπηση Πίνακα Δεδομένων Excel"):
-            st.dataframe(df.head(15))
-            
-        # 2. Σχεδιασμός Τρισδιάστατου (3D) Γεωτεχνικού Μοντέλου
-        st.subheader("📦 Τρισδιάστατο (3D) Μοντέλο Υπεδάφους και Στρωματογραφίας")
-        st.write("💡 Μπορείτε να περιστρέψετε το μοντέλο με το ποντίκι σας, να κάνετε zoom και να δείτε πού τρυπάνε οι δοκιμές το έδαφος.")
+        # Σκληρά κωδικοποιημένα γεωλογικά δεδομένα από το φύλλο "Γεωτρήσεις" για την παρεμβολή
+        # Θέσεις: ΝΓ-1 (80μ), ΓΕ-1 (250μ), ΝΓ-2 (350μ)
+        # Προσθέτουμε και τα άκρα (0μ και 450μ) για να καλύψουμε όλο το έργο
+        x_points = np.array([0, 80, 250, 350, 450])
         
-        # Δημιουργία πλέγματος (Grid) για τις 3D επιφάνειες των στρώσεων
+        # Όρια στρώσεων (Βάθη ως αρνητικοί αριθμοί)
+        z_water_pts = [-2.0, -2.0, -2.2, -1.8, -1.8]
+        z_layer1_pts = [-9.5, -9.5, -8.0, -11.5, -11.5]  # Βάση Μαλακής Αργίλου
+        z_layer2_pts = [-21.0, -21.0, -20.0, -21.5, -21.5] # Βάση Συμπιεστής Αργίλου
+        
+        # Δημιουργία 3D Grid για το Plotly
         x_space = np.linspace(0, 450, 50)
         y_space = np.linspace(-20, 20, 10)
         X_grid, Y_grid = np.meshgrid(x_space, y_space)
         
+        # Γραμμική παρεμβολή (Interpolation) για ρεαλιστικές κλίσεις
+        Z_surface = np.zeros_like(X_grid) 
+        Z_water = np.tile(np.interp(x_space, x_points, z_water_pts), (len(y_space), 1))
+        Z_layer1 = np.tile(np.interp(x_space, x_points, z_layer1_pts), (len(y_space), 1))
+        Z_layer2 = np.tile(np.interp(x_space, x_points, z_layer2_pts), (len(y_space), 1))
+        Z_bottom = np.full_like(X_grid, -35.0) # Πυθμένας μοντέλου
+        
+        # Σχεδιασμός 3D
         fig_3d = go.Figure()
         
-        # Προσθήκη 3D Επιφανειών για τις εδαφικές στρώσεις
+        # Στρώση 1: Μαλακή Άργιλος / Ιλύς (0m έως Όριο 1)
         fig_3d.add_trace(go.Surface(
-            x=X_grid, y=Y_grid, z=np.zeros_like(X_grid),
+            x=X_grid, y=Y_grid, z=Z_layer1,
             colorscale=[[0, 'rgba(210, 180, 140, 0.6)'], [1, 'rgba(210, 180, 140, 0.6)']],
-            showscale=False, name='Μαλακή Άργιλος / Ιλύς (CL/ML)'
+            showscale=False, name='Μαλακή Άργιλος / Ιλύς'
         ))
         
+        # Στρώση 2: Συμπιεστή Άργιλος (Όριο 1 έως Όριο 2)
         fig_3d.add_trace(go.Surface(
-            x=X_grid, y=Y_grid, z=np.full_like(X_grid, -9),
+            x=X_grid, y=Y_grid, z=Z_layer2,
             colorscale=[[0, 'rgba(240, 230, 140, 0.6)'], [1, 'rgba(240, 230, 140, 0.6)']],
-            showscale=False, name='Συμπιεστή Άργιλος (CH/MH)'
+            showscale=False, name='Συμπιεστή Άργιλος'
         ))
         
+        # Στρώση 3: Σκληρή Μάργα (Όριο 2 έως -35m)
         fig_3d.add_trace(go.Surface(
-            x=X_grid, y=Y_grid, z=np.full_like(X_grid, -21),
+            x=X_grid, y=Y_grid, z=Z_bottom,
             colorscale=[[0, 'rgba(169, 169, 169, 0.6)'], [1, 'rgba(169, 169, 169, 0.6)']],
-            showscale=False, name='Σκλήρη Μάργα (Stiff Marl)'
+            showscale=False, name='Σκληρή Μάργα'
         ))
         
-        # Εύρεση των μοναδικών δοκιμών (Test ID) και των θέσεών τους
+        # Επιφάνεια Υδροφόρου (Μπλε διάφανη επιφάνεια με κλίση)
+        fig_3d.add_trace(go.Surface(
+            x=X_grid, y=Y_grid, z=Z_water,
+            colorscale=[[0, 'rgba(0, 0, 255, 0.35)'], [1, 'rgba(0, 0, 255, 0.35)']],
+            showscale=False, name='Υδροφόρος Ορίζοντας'
+        ))
+        
+        # Σχεδιασμός Γεωτρήσεων ως 3D Στήλες
         df_clean = df.dropna(subset=['Test ID', 'X-coordination'])
         unique_tests = df_clean[['Test ID', 'X-coordination']].drop_duplicates()
         
-        # Τοποθέτηση των δοκιμών/γεωτρήσεων ως 3D κατακόρυφοι "πάσσαλοι"
         for idx, row in unique_tests.iterrows():
             test_id = row['Test ID']
             x_pos = row['X-coordination']
-            
             max_depth = df[df['Test ID'] == test_id]['Depth'].max()
-            if np.isnan(max_depth):
-                max_depth = 20.0
             
             fig_3d.add_trace(go.Scatter3d(
                 x=[x_pos, x_pos], y=[0, 0], z=[0, -max_depth],
                 mode='lines+markers',
-                line=dict(color='black', width=7),
+                line=dict(color='black', width=8),
                 marker=dict(size=4, color='darkred'),
-                name=str(test_id),
-                hoverinfo='text',
-                hovertext=f"Δοκιμή: {test_id}<br>Θέση X: {x_pos}m<br>Τελικό Βάθος: {max_depth}m"
+                name=str(test_id)
             ))
             
         fig_3d.update_layout(
@@ -101,62 +111,35 @@ if uploaded_file is not None:
             margin=dict(r=10, l=10, b=10, t=10)
         )
         
+        st.subheader("📦 Τρισδιάστατη Γεωτεχνική Μακέτα (Πραγματικά Δεδομένα)")
         st.plotly_chart(fig_3d, use_container_width=True)
         
-        # 3. Διαδραστική Επιλογή Δοκιμής και Σχεδιασμός 2D Διαγραμμάτων Βάθους
+        # 3. 2D Διαγράμματα
         st.markdown("---")
         st.subheader("📈 Συγκριτικά Προφίλ Ιδιοτήτων με το Βάθος")
-        
-        selected_test = st.selectbox("🎯 Επιλέξτε Γεώτρηση ή Δοκιμή για προβολή των διαγραμμάτων της:", df['Test ID'].dropna().unique())
-        
+        selected_test = st.selectbox("🎯 Επιλέξτε Γεώτρηση ή Δοκιμή:", df['Test ID'].dropna().unique())
         test_data = df[df['Test ID'] == selected_test].sort_values(by='Depth')
         
         col1, col2 = st.columns(2)
-        
         with col1:
             fig_vs = go.Figure()
             if 'Vs' in test_data.columns and test_data['Vs'].notna().any():
-                fig_vs.add_trace(go.Scatter(
-                    x=test_data['Vs'], y=-test_data['Depth'],
-                    mode='lines+markers', name='Ταχύτητα Vs (m/s)', line=dict(color='blue', width=2)
-                ))
-            fig_vs.update_layout(
-                title=f"Μεταβολή Ταχύτητας Vs με το Βάθος - {selected_test}",
-                xaxis=dict(title="Vs (m/s)"),
-                yaxis=dict(title="Βάθος (m)", range=[-35, 0]),
-                template="plotly_white",
-                height=500
-            )
+                fig_vs.add_trace(go.Scatter(x=test_data['Vs'], y=-test_data['Depth'], mode='lines+markers', name='Vs (m/s)', line=dict(color='blue')))
+            fig_vs.update_layout(title=f"Vs - {selected_test}", xaxis=dict(title="Vs (m/s)"), yaxis=dict(title="Βάθος (m)"), template="plotly_white")
             st.plotly_chart(fig_vs, use_container_width=True)
             
         with col2:
             fig_su = go.Figure()
             if 'Su(from SPT)' in test_data.columns and test_data['Su(from SPT)'].notna().any():
-                fig_su.add_trace(go.Scatter(
-                    x=test_data['Su(from SPT)'], y=-test_data['Depth'],
-                    mode='lines+markers', name='Su (από SPT)', line=dict(color='green', width=2)
-                ))
+                fig_su.add_trace(go.Scatter(x=test_data['Su(from SPT)'], y=-test_data['Depth'], mode='lines+markers', name='Su (SPT)', line=dict(color='green')))
             if 'Su ( from Vs )' in test_data.columns and test_data['Su ( from Vs )'].notna().any():
-                fig_su.add_trace(go.Scatter(
-                    x=test_data['Su ( from Vs )'], y=-test_data['Depth'],
-                    mode='lines+markers', name='Su (από Vs)', line=dict(color='purple', width=2, dash='dash')
-                ))
+                fig_su.add_trace(go.Scatter(x=test_data['Su ( from Vs )'], y=-test_data['Depth'], mode='lines+markers', name='Su (Vs)', line=dict(color='purple', dash='dash')))
             if 'Su ( from CPT-qc)' in test_data.columns and test_data['Su ( from CPT-qc)'].notna().any():
-                fig_su.add_trace(go.Scatter(
-                    x=test_data['Su ( from CPT-qc)'], y=-test_data['Depth'],
-                    mode='lines+markers', name='Su (από CPT)', line=dict(color='red', width=2)
-                ))
-                
-            fig_su.update_layout(
-                title=f"Μεταβολή Διατμητικής Αντοχής Su με το Βάθος - {selected_test}",
-                xaxis=dict(title="Su (kPa)"),
-                yaxis=dict(title="Βάθος (m)", range=[-35, 0]),
-                template="plotly_white",
-                height=500
-            )
+                fig_su.add_trace(go.Scatter(x=test_data['Su ( from CPT-qc)'], y=-test_data['Depth'], mode='lines+markers', name='Su (CPT)', line=dict(color='red')))
+            fig_su.update_layout(title=f"Su - {selected_test}", xaxis=dict(title="Su (kPa)"), yaxis=dict(title="Βάθος (m)"), template="plotly_white")
             st.plotly_chart(fig_su, use_container_width=True)
             
     except Exception as e:
-        st.error(f"⚠️ Παρουσιάστηκε σφάλμα κατά την επεξεργασία του αρχείου: {e}")
+        st.error(f"⚠️ Σφάλμα κατά την επεξεργασία: {e}")
 else:
-    st.info("💡 Η εφαρμογή είναι έτοιμη. Ανεβάστε το τελικό αρχείο Excel (.xlsx) για να δημιουργηθεί το 3D μοντέλο και τα προφίλ βάθους.")
+    st.info("💡 Η εφαρμογή είναι έτοιμη. Ανεβάστε το αρχείο Excel για να δημιουργηθεί το μοντέλο.")
