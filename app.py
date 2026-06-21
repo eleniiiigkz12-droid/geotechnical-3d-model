@@ -33,46 +33,48 @@ if uploaded_file is not None:
         # Πραγματικά γεωλογικά δεδομένα από το φύλλο "Γεωτρήσεις"
         x_points = [0, 80, 250, 350, 450]
         z_water_pts = [-2.0, -2.0, -2.2, -1.8, -1.8]
-        z_layer1_pts = [-9.5, -9.5, -8.0, -11.5, -11.5]  # Βάση 1ης στρώσης (Μαλακή Άργιλος)
-        z_layer2_pts = [-21.0, -21.0, -20.0, -21.5, -21.5] # Βάση 2ης στρώσης (Συμπιεστή Άργιλος)
-        z_bottom_pts = [-35.0, -35.0, -35.0, -35.0, -35.0] # Πυθμένας (Σκληρή Μάργα)
+        z_layer1_pts = [-9.5, -9.5, -8.0, -11.5, -11.5]  
+        z_layer2_pts = [-21.0, -21.0, -20.0, -21.5, -21.5] 
+        z_bottom_pts = [-35.0, -35.0, -35.0, -35.0, -35.0] 
 
         fig_3d = go.Figure()
         
-        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΣΥΜΠΑΓΕΙΣ ΟΓΚΟΥΣ (Με κλείσιμο των πλευρών) ---
-        # Για να φαίνεται το πάχος, ενώνουμε την πάνω επιφάνεια με την κάτω σχηματίζοντας κλειστό "κουτί"
-        for y_val in [-5, 5]: # Σχεδιάζουμε μια λωρίδα με πλάτος για τρισδιάστατη αίσθηση πάχους
+        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΣΥΜΠΑΓΕΙΣ ΟΓΚΟΥΣ ---
+        for y_val in [-5, 5]: 
             
-            # Στρώση 1: Μαλακή Άργιλος / Ιλύς (Από 0 έως τη βάση της 1ης στρώσης)
+            # Στρώση 1: Μαλακή Άργιλος / Ιλύς
             fig_3d.add_trace(go.Scatter3d(
                 x=x_points + x_points[::-1],
                 y=[y_val]*5 + [y_val]*5,
                 z=[0, 0, 0, 0, 0] + z_layer1_pts[::-1],
+                mode='lines',
                 fill='toself',
                 fillcolor='rgba(210, 180, 140, 0.7)',
-                line=dict(color='rgba(139, 115, 85, 0.8)', width=3),
+                line=dict(color='rgba(139, 115, 85, 0.8)', width=2),
                 name='Μαλακή Άργιλος / Ιλύς (CL/ML)'
             ))
             
-            # Στρώση 2: Συμπιεστή Άργιλος (Από τη βάση της 1ης έως τη βάση της 2ης)
+            # Στρώση 2: Συμπιεστή Άργιλος
             fig_3d.add_trace(go.Scatter3d(
                 x=x_points + x_points[::-1],
                 y=[y_val]*5 + [y_val]*5,
                 z=z_layer1_pts + z_layer2_pts[::-1],
+                mode='lines',
                 fill='toself',
                 fillcolor='rgba(240, 230, 140, 0.7)',
-                line=dict(color='rgba(184, 134, 11, 0.8)', width=3),
+                line=dict(color='rgba(184, 134, 11, 0.8)', width=2),
                 name='Συμπιεστή Άργιλος (CH/MH)'
             ))
             
-            # Στρώση 3: Σκληρή Μάργα (Από τη βάση της 2ης έως τον πυθμένα στα -35m)
+            # Στρώση 3: Σκληρή Μάργα
             fig_3d.add_trace(go.Scatter3d(
                 x=x_points + x_points[::-1],
                 y=[y_val]*5 + [y_val]*5,
                 z=z_layer2_pts + z_bottom_pts[::-1],
+                mode='lines',
                 fill='toself',
                 fillcolor='rgba(169, 169, 169, 0.7)',
-                line=dict(color='rgba(105, 105, 105, 0.8)', width=3),
+                line=dict(color='rgba(105, 105, 105, 0.8)', width=2),
                 name='Σκλήρη Μάργα (Stiff Marl)'
             ))
 
@@ -84,7 +86,7 @@ if uploaded_file is not None:
             mode='lines+text',
             line=dict(color='rgb(0, 120, 255)', width=8),
             name='Υδροφόρος Ορίζοντας',
-            text=["", "", "💧 ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ", "", ""], # Εμφάνιση κειμένου στο κέντρο της γραμμής
+            text=["", "", "💧 ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ", "", ""], 
             textposition="top center",
             textfont=dict(size=14, color="blue")
         ))
