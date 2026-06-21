@@ -39,44 +39,42 @@ if uploaded_file is not None:
 
         fig_3d = go.Figure()
         
-        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΣΥΜΠΑΓΕΙΣ ΟΓΚΟΥΣ ---
-        for y_val in [-5, 5]: 
-            
-            # Στρώση 1: Μαλακή Άργιλος / Ιλύς
-            fig_3d.add_trace(go.Scatter3d(
-                x=x_points + x_points[::-1],
-                y=[y_val]*5 + [y_val]*5,
-                z=[0, 0, 0, 0, 0] + z_layer1_pts[::-1],
-                mode='lines',
-                fill='toself',
-                fillcolor='rgba(210, 180, 140, 0.7)',
-                line=dict(color='rgba(139, 115, 85, 0.8)', width=2),
-                name='Μαλακή Άργιλος / Ιλύς (CL/ML)'
-            ))
-            
-            # Στρώση 2: Συμπιεστή Άργιλος
-            fig_3d.add_trace(go.Scatter3d(
-                x=x_points + x_points[::-1],
-                y=[y_val]*5 + [y_val]*5,
-                z=z_layer1_pts + z_layer2_pts[::-1],
-                mode='lines',
-                fill='toself',
-                fillcolor='rgba(240, 230, 140, 0.7)',
-                line=dict(color='rgba(184, 134, 11, 0.8)', width=2),
-                name='Συμπιεστή Άργιλος (CH/MH)'
-            ))
-            
-            # Στρώση 3: Σκληρή Μάργα
-            fig_3d.add_trace(go.Scatter3d(
-                x=x_points + x_points[::-1],
-                y=[y_val]*5 + [y_val]*5,
-                z=z_layer2_pts + z_bottom_pts[::-1],
-                mode='lines',
-                fill='toself',
-                fillcolor='rgba(169, 169, 169, 0.7)',
-                line=dict(color='rgba(105, 105, 105, 0.8)', width=2),
-                name='Σκλήρη Μάργα (Stiff Marl)'
-            ))
+        # --- ΔΗΜΙΟΥΡΓΙΑ ΣΥΜΠΑΓΩΝ ΣΤΡΩΣΕΩΝ ΜΕ MESH3D ---
+        # Ορίζουμε τις 4 γωνίες κάθε στρώματος για να δημιουργήσουμε το "τοιχίο" (Cross-section με πλάτος)
+        # Στρώση 1: Μαλακή Άργιλος / Ιλύς (Από Z=0 έως τη βάση της 1ης στρώσης)
+        x_s1 = x_points + x_points[::-1]
+        y_s1 = [-5]*5 + [5]*5
+        z_s1_top = [0, 0, 0, 0, 0] + [0, 0, 0, 0, 0]
+        z_s1_bot = z_layer1_pts + z_layer1_pts[::-1]
+        
+        fig_3d.add_trace(go.Mesh3d(
+            x=x_points + x_points,
+            y=[-5]*5 + [5]*5,
+            z=z_layer1_pts + [0]*5,
+            color='rgba(210, 180, 140, 0.7)',
+            name='Μαλακή Άργιλος / Ιλύς (CL/ML)',
+            showlegend=True
+        ))
+        
+        # Στρώση 2: Συμπιεστή Άργιλος (Από τη βάση της 1ης έως τη βάση της 2ης)
+        fig_3d.add_trace(go.Mesh3d(
+            x=x_points + x_points,
+            y=[-5]*5 + [5]*5,
+            z=z_layer2_pts + z_layer1_pts,
+            color='rgba(240, 230, 140, 0.7)',
+            name='Συμπιεστή Άργιλος (CH/MH)',
+            showlegend=True
+        ))
+        
+        # Στρώση 3: Σκληρή Μάργα (Από τη βάση της 2ης έως τον πυθμένα στα -35m)
+        fig_3d.add_trace(go.Mesh3d(
+            x=x_points + x_points,
+            y=[-5]*5 + [5]*5,
+            z=z_bottom_pts + z_layer2_pts,
+            color='rgba(169, 169, 169, 0.7)',
+            name='Σκλήρη Μάργα (Stiff Marl)',
+            showlegend=True
+        ))
 
         # --- ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ ΩΣ ΜΠΛΕ ΓΡΑΜΜΗ ΜΕ ΚΑΘΑΡΗ ΤΑΜΠΕΛΑ ---
         fig_3d.add_trace(go.Scatter3d(
@@ -107,7 +105,8 @@ if uploaded_file is not None:
                 marker=dict(size=5, color='darkred'),
                 text=[str(test_id), ""],
                 textposition="top center",
-                name=str(test_id)
+                name=str(test_id),
+                showlegend=False
             ))
             
         fig_3d.update_layout(
