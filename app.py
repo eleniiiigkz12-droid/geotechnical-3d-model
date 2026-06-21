@@ -14,14 +14,21 @@ uploaded_file = st.file_uploader("📂 Ανεβάστε το τελικό αρχ
 
 if uploaded_file is not None:
     try:
-        # Ανάγνωση των δεδομένων από το Excel (διαβάζει όλες τις στήλες ως κείμενο αρχικά για να διορθώσει τα κόμματα)
-        df = pd.read_excel(uploaded_file, dtype=str)
+        # Ανάγνωση των δεδομένων από το Excel απευθείας
+        df = pd.read_excel(uploaded_file)
         
-        # Αντικατάσταση του κόμματος με τελεία για τους δεκαδικούς αριθμούς και μετατροπή σε αριθμητικά δεδομένα
-        cols_to_convert = ['X-coordination', 'Depth', 'N-corrected', 'Su(from SPT)', 'Vs', 'Su(from Vs)', 'CPT-qc', 'Su(from CPT-qc)']
-        for col in cols_to_convert:
+        # Καθαρισμός και μετατροπή στηλών σε αριθμητικές, είτε έχουν κόμματα είτε τελείες
+        cols_to_convert = ['X-coordination', 'Depth', 'N-corrected', 'Su(from SPT)', 'Vs', 'Su ( from Vs )', 'CPT-qc', 'Su ( from CPT-qc)']
+        for col in df.columns:
+            # Αφαιρούμε τυχόν κενά από τα ονόματα των στηλών για σιγουριά
+            df = df.rename(columns={col: col.strip()})
+            
+        # Επανυπολογισμός των στηλών-κλειδιών με ασφάλεια
+        fixed_cols = ['X-coordination', 'Depth', 'N-corrected', 'Su(from SPT)', 'Vs', 'Su ( from Vs )', 'CPT-qc', 'Su ( from CPT-qc)']
+        for col in fixed_cols:
             if col in df.columns:
-                df[col] = df[col].str.replace(',', '.', regex=False)
+                if df[col].dtype == object:
+                    df[col] = df[col].astype(str).str.replace(',', '.', regex=False)
                 df[col] = pd.to_numeric(df[col], errors='coerce')
         
         st.success("Το αρχείο φορτώθηκε και επεξεργάστηκε επιτυχώς!")
@@ -36,34 +43,31 @@ if uploaded_file is not None:
         
         # Δημιουργία πλέγματος (Grid) για τις 3D επιφάνειες των στρώσεων
         x_space = np.linspace(0, 450, 50)
-        y_space = np.linspace(-20, 20, 10)  # Υποτιθέμενο σταθερό πλάτος ζώνης έργου 40 μέτρων
+        y_space = np.linspace(-20, 20, 10)
         X_grid, Y_grid = np.meshgrid(x_space, y_space)
         
         fig_3d = go.Figure()
         
-        # Προσθήκη 3D Επιφανειών για τις εδαφικές στρώσεις (Βάσει των γενικών ορίων)
-        # Επιφάνεια 1: Φυσικό Έδαφος (Z = 0)
+        # Προσθήκη 3D Επιφανειών για τις εδαφικές στρώσεις
         fig_3d.add_trace(go.Surface(
             x=X_grid, y=Y_grid, z=np.zeros_like(X_grid),
             colorscale=[[0, 'rgba(210, 180, 140, 0.6)'], [1, 'rgba(210, 180, 140, 0.6)']],
             showscale=False, name='Μαλακή Άργιλος / Ιλύς (CL/ML)'
         ))
         
-        # Επιφάνεια 2: Όριο Μαλακής/Συμπιεστής Αργίλου (Z = -9μ)
         fig_3d.add_trace(go.Surface(
             x=X_grid, y=Y_grid, z=np.full_like(X_grid, -9),
             colorscale=[[0, 'rgba(240, 230, 140, 0.6)'], [1, 'rgba(240, 230, 140, 0.6)']],
             showscale=False, name='Συμπιεστή Άργιλος (CH/MH)'
         ))
         
-        # Επιφάνεια 3: Όριο Συμπιεστής Αργίλου/Μάργας (Z = -21μ)
         fig_3d.add_trace(go.Surface(
             x=X_grid, y=Y_grid, z=np.full_like(X_grid, -21),
             colorscale=[[0, 'rgba(169, 169, 169, 0.6)'], [1, 'rgba(169, 169, 169, 0.6)']],
             showscale=False, name='Σκλήρη Μάργα (Stiff Marl)'
         ))
         
-        # Εύρεση των μοναδικών δοκιμών (Test ID) και των θέσεών τους (X-coordination)
+        # Εύρεση των μοναδικών δοκιμών (Test ID) και των θέσεών τους
         df_clean = df.dropna(subset=['Test ID', 'X-coordination'])
         unique_tests = df_clean[['Test ID', 'X-coordination']].drop_duplicates()
         
@@ -72,10 +76,9 @@ if uploaded_file is not None:
             test_id = row['Test ID']
             x_pos = row['X-coordination']
             
-            # Εύρεση του μέγιστου βάθους της συγκεκριμένης δοκιμής
             max_depth = df[df['Test ID'] == test_id]['Depth'].max()
             if np.isnan(max_depth):
-                max_depth = 20.0  # Default βάθος αν δεν βρεθεί τιμή
+                max_depth = 20.0
             
             fig_3d.add_trace(go.Scatter3d(
                 x=[x_pos, x_pos], y=[0, 0], z=[0, -max_depth],
@@ -87,7 +90,6 @@ if uploaded_file is not None:
                 hovertext=f"Δοκιμή: {test_id}<br>Θέση X: {x_pos}m<br>Τελικό Βάθος: {max_depth}m"
             ))
             
-        # Ρυθμίσεις εμφάνισης του 3D διαγράμματος
         fig_3d.update_layout(
             scene=dict(
                 xaxis=dict(title='Μήκος Χ (m)', range=[0, 450]),
@@ -105,26 +107,19 @@ if uploaded_file is not None:
         st.markdown("---")
         st.subheader("📈 Συγκριτικά Προφίλ Ιδιοτήτων με το Βάθος")
         
-        # Dropdown μενού για να επιλέγει ο χρήστης ποιο σημείο θέλει να μελετήσει
         selected_test = st.selectbox("🎯 Επιλέξτε Γεώτρηση ή Δοκιμή για προβολή των διαγραμμάτων της:", df['Test ID'].dropna().unique())
         
-        # Φιλτράρισμα δεδομένων για την επιλεγμένη δοκιμή
         test_data = df[df['Test ID'] == selected_test].sort_values(by='Depth')
         
-        # Δημιουργία 2 στηλών στην οθόνη για τα 2 παράλληλα γραφήματα
         col1, col2 = st.columns(2)
         
         with col1:
-            # Γράφημα Α: Προφίλ Ταχυτήτων Vs
             fig_vs = go.Figure()
-            
-            # Σχεδιασμός Vs
             if 'Vs' in test_data.columns and test_data['Vs'].notna().any():
                 fig_vs.add_trace(go.Scatter(
                     x=test_data['Vs'], y=-test_data['Depth'],
                     mode='lines+markers', name='Ταχύτητα Vs (m/s)', line=dict(color='blue', width=2)
                 ))
-                
             fig_vs.update_layout(
                 title=f"Μεταβολή Ταχύτητας Vs με το Βάθος - {selected_test}",
                 xaxis=dict(title="Vs (m/s)"),
@@ -135,25 +130,20 @@ if uploaded_file is not None:
             st.plotly_chart(fig_vs, use_container_width=True)
             
         with col2:
-            # Γράφημα Β: Προφίλ Διατμητικής Αντοχής Su
             fig_su = go.Figure()
-            
-            # Έλεγχος και σχεδιασμός Su από SPT
             if 'Su(from SPT)' in test_data.columns and test_data['Su(from SPT)'].notna().any():
                 fig_su.add_trace(go.Scatter(
                     x=test_data['Su(from SPT)'], y=-test_data['Depth'],
                     mode='lines+markers', name='Su (από SPT)', line=dict(color='green', width=2)
                 ))
-            # Έλεγχος και σχεδιασμός Su από Vs
-            if 'Su(from Vs)' in test_data.columns and test_data['Su(from Vs)'].notna().any():
+            if 'Su ( from Vs )' in test_data.columns and test_data['Su ( from Vs )'].notna().any():
                 fig_su.add_trace(go.Scatter(
-                    x=test_data['Su(from Vs)'], y=-test_data['Depth'],
+                    x=test_data['Su ( from Vs )'], y=-test_data['Depth'],
                     mode='lines+markers', name='Su (από Vs)', line=dict(color='purple', width=2, dash='dash')
                 ))
-            # Έλεγχος και σχεδιασμός Su από CPT-qc
-            if 'Su(from CPT-qc)' in test_data.columns and test_data['Su(from CPT-qc)'].notna().any():
+            if 'Su ( from CPT-qc)' in test_data.columns and test_data['Su ( from CPT-qc)'].notna().any():
                 fig_su.add_trace(go.Scatter(
-                    x=test_data['Su(from CPT-qc)'], y=-test_data['Depth'],
+                    x=test_data['Su ( from CPT-qc)'], y=-test_data['Depth'],
                     mode='lines+markers', name='Su (από CPT)', line=dict(color='red', width=2)
                 ))
                 
