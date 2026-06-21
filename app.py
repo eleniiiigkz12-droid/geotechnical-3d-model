@@ -33,7 +33,7 @@ if uploaded_file is not None:
         # Πραγματικά γεωλογικά δεδομένα και νέα ύψη υδροφόρου ανά γεώτρηση
         # Θέσεις Χ: ΝΓ1=80m, Γ1=180m, ΓΕ1=250m, ΝΓ2=350m (με προσθήκη των άκρων 0m και 450m)
         x_points = np.array([0, 80, 180, 250, 350, 450])
-        z_water_pts = np.array([-1.20, -1.20, -0.30, -0.90, -0.60, -0.60]) # Τα πραγματικά σου υψόμετρα
+        z_water_pts = np.array([-1.20, -1.20, -0.30, -0.90, -0.60, -0.60]) 
         
         # Όρια στρώσεων βάσει των γεωτρήσεων
         z_layer1_pts = np.array([-9.5, -9.5, -8.5, -8.0, -11.5, -11.5])  
@@ -55,7 +55,6 @@ if uploaded_file is not None:
         fig_3d = go.Figure()
         
         # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΗΜΙΔΙΑΦΑΝΟΙ ΣΥΜΠΑΓΕΙΣ ΟΓΚΟΥΣ (ΧΩΡΙΣ ΚΕΝΑ) ---
-        # Χρησιμοποιούμε πολλαπλές ενδιάμεσες επιφάνειες για να "γεμίσει" το κενό εσωτερικά
         
         # Στρώση 1: Μαλακή Άργιλος / Ιλύς (Από 0m έως τη βάση της 1ης στρώσης)
         for offset in np.linspace(0, 1, 6):
@@ -84,11 +83,11 @@ if uploaded_file is not None:
                 name='Σκλήρη Μάργα (Stiff Marl)', legendgroup='g3', showlegend=(offset==0)
             ))
 
-        # --- ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ (Ως παχιά, έντονη μπλε 3D γραμμή με τα πραγματικά ύψη) ---
+        # --- ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ (Με διορθωμένους άξονες ίσου μήκους = 4 στοιχεία) ---
         fig_3d.add_trace(go.Scatter3d(
-            x=x_points[1:-1], # Σχεδίαση μόνο στα σημεία των πραγματικών γεωτρήσεων
-            y=[0]*4,
-            z=z_water_pts[1:-1],
+            x=[80, 180, 250, 350], 
+            y=[0, 0, 0, 0],
+            z=[-1.20, -0.30, -0.90, -0.60],
             mode='lines+markers+text',
             line=dict(color='rgb(0, 80, 255)', width=12),
             marker=dict(size=8, color='darkblue', symbol='diamond'),
@@ -98,7 +97,7 @@ if uploaded_file is not None:
             textfont=dict(size=15, color="darkblue")
         ))
         
-        # Σχεδιασμός Κατακόρυφων Γεωτρήσεων (Φαίνονται τέλεια λόγω της διαφάνειας του εδάφους)
+        # Σχεδιασμός Κατακόρυφων Γεωτρήσεων
         df_clean = df.dropna(subset=['Test ID', 'X-coordination'])
         unique_tests = df_clean[['Test ID', 'X-coordination']].drop_duplicates()
         
@@ -123,7 +122,6 @@ if uploaded_file is not None:
                 xaxis=dict(title='Μήκος Χ (m)', range=[0, 450]),
                 yaxis=dict(title='Πλάτος Υ (m)', range=[-10, 10]),
                 zaxis=dict(title='Βάθος Ζ (m)', range=[-35, 5]),
-                # 3D Υπερύψωση για να είναι πεντακάθαρη η διακύμανση του υδροφόρου
                 aspectratio=dict(x=3, y=1, z=2.2)
             ),
             height=700,
