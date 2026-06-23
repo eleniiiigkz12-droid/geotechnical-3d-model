@@ -7,7 +7,7 @@ import numpy as np
 st.set_page_config(page_title="3D Geotechnical Cross-Section & Slicing", layout="wide")
 
 st.title("📦 Real-Data Τρισδιάστατο (3D) Γεωτεχνικό Μοντέλο (0-450m)")
-st.write("Συμπαγής και ημιδιάφανη απεικόνιση των εδαφικών στρώσεων με τις πραγματικές κλίσεις του Υδροφόρου Ορίζοντα, τη δοκιμή CPT στα 280m, τοπικές ανωμαλίες και δυνατότητα δυναμικών τομών.")
+st.write("Συμπαγής και ημιδιάφανη απεικόνιση των εδαφικών στρώσεων με Mesh3d, τις πραγματικές κλίσεις του Υδροφόρου Ορίζοντα, τη δοκιμή CPT στα 280m, τοπικές ανωμαλίες και δυνατότητα δυναμικών τομών.")
 
 # 1. Εισαγωγή Αρχείου Excel
 uploaded_file = st.file_uploader("📂 Ανεβάστε το τελικό αρχείο Excel (.xlsx)", type=["xlsx"])
@@ -20,7 +20,7 @@ if uploaded_file is not None:
         # Καθαρισμός στηλών από κενά στην αρχή και στο τέλος
         df.columns = [col.strip() for col in df.columns]
         
-        # ΕΞΥΠΝΗ ΟΜΑΛΟΠΟΙΗΣΗ ΣΤΗΛΩΝ (Βασισμένη σε λέξεις-κλειδιά για αποφυγή KeyError)
+        # ΕΞΥΠΝΗ ΟΜΑΛΟΠΟΙΗΣΗ ΣΤΗΛΩΝ
         column_mapping = {}
         for col in df.columns:
             col_lower = col.lower()
@@ -45,7 +45,7 @@ if uploaded_file is not None:
                 
         df = df.rename(columns=column_mapping)
             
-        # Μετατροπή των στηλών που υπάρχουν όντως στο DataFrame
+        # Μετατροπή των στηλών που υπάρχουν όντως στο DataFrame σε αριθμούς
         for col in df.columns:
             if col in ['X-coordination', 'Depth', 'N-corrected', 'Su(from SPT)', 'Vs', 'Su (from Vs)', 'Vs (from CPT-qc)', 'Su (from CPT-qc)']:
                 if df[col].dtype == object:
@@ -74,63 +74,69 @@ if uploaded_file is not None:
         z_layer2_pts = np.array([-21.0, -21.0, -20.5, -20.0, -21.0, -21.5, -21.5]) 
         z_bottom_pts = np.array([-35.0, -35.0, -35.0, -35.0, -35.0, -35.0, -35.0]) 
 
-        # Δημιουργία πυκνού 3D Grid προσαρμοσμένου στα όρια της τομής
-        x_space = np.linspace(min_x, max_x, 40)
-        y_space = np.linspace(-10, 10, 5)
-        X_grid, Y_grid = np.meshgrid(x_space, y_space)
+        # Δημιουργία Grid 2 γραμμών (Y=-10 και Y=10) για να φτιάξουμε τέλειους κλειστούς 3D όγκους
+        x_space = np.linspace(min_x, max_x, 30)
+        y_edges = np.array([-10, 10])
         
-        # Παρεμβολή (Interpolation)
-        Z_surface = np.zeros_like(X_grid)
-        Z_water = np.tile(np.interp(x_space, x_points, z_water_pts), (len(y_space), 1))
-        Z_layer1 = np.tile(np.interp(x_space, x_points, z_layer1_pts), (len(y_space), 1))
-        Z_layer2 = np.tile(np.interp(x_space, x_points, z_layer2_pts), (len(y_space), 1))
-        Z_bottom = np.tile(np.interp(x_space, x_points, z_bottom_pts), (len(y_space), 1))
+        # Υπολογισμός των υψών οροφής και πυθμένα με παρεμβολή
+        z_surf_line = np.zeros_like(x_space)
+        z_l1_line = np.interp(x_space, x_points, z_layer1_pts)
+        z_l2_line = np.interp(x_space, x_points, z_layer2_pts)
+        z_bot_line = np.interp(x_space, x_points, z_bottom_pts)
+
+        # Συνάρτηση που δημιουργεί τις 3D συντεταγμένες ενός κλειστού όγκου (Mesh3d)
+        def create_mesh_nodes(x_s, y_e, z_top_l, z_bot_l):
+            x_nodes = np.concatenate([x_s, x_s, x_s, x_s])
+            y_nodes = np.concatenate([np.full_like(x_s, y_e[0]), np.full_like(x_s, y_e[1]), np.full_like(x_s, y_e[0]), np.full_like(x_s, y_e[1])])
+            z_nodes = np.concatenate([z_top_l, z_top_l, z_bot_l, z_bot_l])
+            return x_nodes, y_nodes, z_nodes
 
         fig_3d = go.Figure()
         
-        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΗΜΙΔΙΑΦΑΝΟΙ ΣΥΜΠΑΓΕΙΣ ΟΓΚΟΥΣ ---
-        for offset in np.linspace(0, 1, 6):
-            Z_fill = Z_surface * (1 - offset) + Z_layer1 * offset
-            fig_3d.add_trace(go.Surface(
-                x=X_grid, y=Y_grid, z=Z_fill,
-                colorscale=[[0, '#d2b48c'], [1, '#d2b48c']], opacity=0.30, showscale=False,
-                name='Μαλακή Άργιλος / Ιλύς (CL/ML)', legendgroup='g1', showlegend=bool(offset==0)
-            ))
+        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΣΥΜΠΑΓΕΙΣ ΟΓΚΟΥΣ ΜΕ MESH3D ---
         
-        for offset in np.linspace(0, 1, 6):
-            Z_fill = Z_layer1 * (1 - offset) + Z_layer2 * offset
-            fig_3d.add_trace(go.Surface(
-                x=X_grid, y=Y_grid, z=Z_fill,
-                colorscale=[[0, '#ebdca5'], [1, '#ebdca5']], opacity=0.30, showscale=False,
-                name='Συμπιεστή Άργιλος (CH/MH)', legendgroup='g2', showlegend=bool(offset==0)
-            ))
+        # Στρώση 1: Μαλακή Άργιλος / Ιλύς (CL/ML) - Καφέ
+        x_m1, y_m1, z_m1 = create_mesh_nodes(x_space, y_edges, z_surf_line, z_l1_line)
+        fig_3d.add_trace(go.Mesh3d(
+            x=x_m1, y=y_m1, z=z_m1, color='#d2b48c', opacity=0.45, Alphahull=0,
+            name='Μαλακή Άργιλος / Ιλύς (CL/ML)', legendgroup='g1', showlegend=True
+        ))
         
-        for offset in np.linspace(0, 1, 6):
-            Z_fill = Z_layer2 * (1 - offset) + Z_bottom * offset
-            fig_3d.add_trace(go.Surface(
-                x=X_grid, y=Y_grid, z=Z_fill,
-                colorscale=[[0, '#a9a9a9'], [1, '#a9a9a9']], opacity=0.30, showscale=False,
-                name='Σκλήρη Μάργα (Stiff Marl)', legendgroup='g3', showlegend=bool(offset==0)
-            ))
+        # Στρώση 2: Συμπιεστή Άργιλος (CH/MH) - Κίτρινο
+        x_m2, y_m2, z_m2 = create_mesh_nodes(x_space, y_edges, z_l1_line, z_l2_line)
+        fig_3d.add_trace(go.Mesh3d(
+            x=x_m2, y=y_m2, z=z_m2, color='#ebdca5', opacity=0.45, Alphahull=0,
+            name='Συμπιεστή Άργιλος (CH/MH)', legendgroup='g2', showlegend=True
+        ))
+        
+        # Στρώση 3: Σκληρή Μάργα (Stiff Marl) - Γκρι
+        x_m3, y_m3, z_m3 = create_mesh_nodes(x_space, y_edges, z_l2_line, z_bot_line)
+        fig_3d.add_trace(go.Mesh3d(
+            x=x_m3, y=y_m3, z=z_m3, color='#a9a9a9', opacity=0.45, Alphahull=0,
+            name='Σκλήρη Μάργα (Stiff Marl)', legendgroup='g3', showlegend=True
+        ))
 
-        # --- ΠΡΟΣΘΗΚΗ ΤΟΠΙΚΩΝ ΓΕΩΤΕΧΝΙΚΩΝ ΑΝΩΜΑΛΙΩΝ ---
+        # --- ΠΡΟΣΘΗΚΗ ΤΟΠΙΚΩΝ ΓΕΩΤΕΧΝΙΚΩΝ ΑΝΩΜΑΛΙΩΝ (ΩΣ ΠΛΗΡΩΣ ΣΥΜΠΑΓΗ ΚΟΥΤΙΑ) ---
+        
+        # 1. Θύλακας Μηδενικής Αντοχής στη ΝΓ-1 (X=80m, Βάθος 6.5m έως 9.5m)
         if min_x <= 80 <= max_x:
-            x_anom1, y_anom1 = np.meshgrid(np.linspace(max(min_x, 65), min(max_x, 95), 5), np.linspace(-5, 5, 3))
-            for idx, z_val in enumerate(np.linspace(-9.5, -6.5, 4)):
-                fig_3d.add_trace(go.Surface(
-                    x=x_anom1, y=y_anom1, z=np.full_like(x_anom1, z_val),
-                    colorscale=[[0, '#ff4d4d'], [1, '#ff4d4d']], opacity=0.8, showscale=False,
-                    name='⚠️ Ζώνη Μηδενικής Αντοχής (ΝΓ-1)', legendgroup='anom1', showlegend=bool(idx==0)
-                ))
+            x_a1 = np.array([65, 95, 65, 95, 65, 95, 65, 95])
+            y_a1 = np.array([-5, -5, 5, 5, -5, -5, 5, 5])
+            z_a1 = np.array([-6.5, -6.5, -6.5, -6.5, -9.5, -9.5, -9.5, -9.5])
+            fig_3d.add_trace(go.Mesh3d(
+                x=x_a1, y=y_a1, z=z_a1, color='#ff4d4d', opacity=0.85, Alphahull=0,
+                name='⚠️ Ζώνη Μηδενικής Αντοχής (ΝΓ-1)', legendgroup='anom1', showlegend=True
+            ))
 
+        # 2. Φακός Πολύ Σκληρής Αργίλου στο CPT (X=280m, Βάθος 16m έως 20m)
         if min_x <= 280 <= max_x:
-            x_anom2, y_anom2 = np.meshgrid(np.linspace(max(min_x, 265), min(max_x, 295), 5), np.linspace(-5, 5, 3))
-            for idx, z_val in enumerate(np.linspace(-20.0, -16.0, 4)):
-                fig_3d.add_trace(go.Surface(
-                    x=x_anom2, y=y_anom2, z=np.full_like(x_anom2, z_val),
-                    colorscale=[[0, '#2ecc71'], [1, '#2ecc71']], opacity=0.8, showscale=False,
-                    name='💪 Φακός Υψηλής Αντοχής (CPT)', legendgroup='anom2', showlegend=bool(idx==0)
-                ))
+            x_a2 = np.array([265, 295, 265, 295, 265, 295, 265, 295])
+            y_a2 = np.array([-5, -5, 5, 5, -5, -5, 5, 5])
+            z_a2 = np.array([-16.0, -16.0, -16.0, -16.0, -20.0, -20.0, -20.0, -20.0])
+            fig_3d.add_trace(go.Mesh3d(
+                x=x_a2, y=y_a2, z=z_a2, color='#2ecc71', opacity=0.85, Alphahull=0,
+                name='💪 Φακός Υψηλής Αντοχής (CPT)', legendgroup='anom2', showlegend=True
+            ))
 
         # --- ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ ---
         w_mask = (x_points >= min_x) & (x_points <= max_x)
