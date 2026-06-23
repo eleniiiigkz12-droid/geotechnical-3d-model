@@ -84,7 +84,7 @@ if uploaded_file is not None:
         z_l2_line = np.interp(x_space, x_points, z_layer2_pts)
         z_bot_line = np.interp(x_space, x_points, z_bottom_pts)
 
-        # Συνάρτηση που δημιουργεί τις 3D συντεταγμένες και τις τριγωνικές έδρες (Mesh3d) για καμπύλες στρώσεις
+        # Συνάρτηση που δημιουργεί τις 3D συντεταγμένες για καμπύλες στρώσεις (Mesh3d)
         def create_curved_mesh(x_s, y_e, z_top_l, z_bot_l):
             n = len(x_s)
             # Κόμβοι οροφής (Y = -10 και Y = 10)
@@ -96,29 +96,29 @@ if uploaded_file is not None:
             
             x_nodes = np.concatenate([x_top_y1, x_top_y2, x_bot_y1, x_bot_y2])
             y_nodes = np.concatenate([y_top_y1, y_top_y2, y_bot_y1, y_bot_y2])
-            z_nodes = np.concatenate([z_top_y1, z_top_y2, z_bot_y1, z_bot_y2])
+            z_nodes = np.concatenate([z_top_l, z_top_l, z_bot_l, z_bot_l])
             return x_nodes, y_nodes, z_nodes
 
         fig_3d = go.Figure()
         
-        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΣΥΜΠΑΓΕΙΣ ΚΑΜΠΥΛΩΤΕΣ ΟΓΚΟΥΣ ΜΕ MESH3D ---
+        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΣΥΜΠΑΓΕΙΣ ΚΑΜΠΥΛΩΤΕΣ ΟΓΚΟΥΣ ΜΕ MESH3D (Διορθώθηκε το όνομα της συνάρτησης) ---
         
         # Στρώση 1: Μαλακή Άργιλος / Ιλύς (CL/ML) - Καφέ
-        x_m1, y_m1, z_m1 = create_mesh_nodes(x_space, y_edges, z_surf_line, z_l1_line)
+        x_m1, y_m1, z_m1 = create_curved_mesh(x_space, y_edges, z_surf_line, z_l1_line)
         fig_3d.add_trace(go.Mesh3d(
             x=x_m1, y=y_m1, z=z_m1, color='#d2b48c', opacity=0.45, alphahull=0,
             name='Μαλακή Άργιλος / Ιλύς (CL/ML)', legendgroup='g1', showlegend=True
         ))
         
         # Στρώση 2: Συμπιεστή Άργιλος (CH/MH) - Κίτρινο
-        x_m2, y_m2, z_m2 = create_mesh_nodes(x_space, y_edges, z_l1_line, z_l2_line)
+        x_m2, y_m2, z_m2 = create_curved_mesh(x_space, y_edges, z_l1_line, z_l2_line)
         fig_3d.add_trace(go.Mesh3d(
             x=x_m2, y=y_m2, z=z_m2, color='#ebdca5', opacity=0.45, alphahull=0,
             name='Συμπιεστή Άργιλος (CH/MH)', legendgroup='g2', showlegend=True
         ))
         
         # Στρώση 3: Σκληρή Μάργα (Stiff Marl) - Γκρι
-        x_m3, y_m3, z_m3 = create_mesh_nodes(x_space, y_edges, z_l2_line, z_bot_line)
+        x_m3, y_m3, z_m3 = create_curved_mesh(x_space, y_edges, z_l2_line, z_bot_line)
         fig_3d.add_trace(go.Mesh3d(
             x=x_m3, y=y_m3, z=z_m3, color='#a9a9a9', opacity=0.45, alphahull=0,
             name='Σκλήρη Μάργα (Stiff Marl)', legendgroup='g3', showlegend=True
