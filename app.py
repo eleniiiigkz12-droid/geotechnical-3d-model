@@ -88,20 +88,31 @@ if uploaded_file is not None:
         def create_curved_mesh(x_s, y_e, z_top_l, z_bot_l):
             n = len(x_s)
             # Κόμβοι οροφής (Y = -10 και Y = 10)
-            x_top_y1, y_top_y1, z_top_y1 = x_s, np.full(n, y_e[0]), z_top_l
-            x_top_y2, y_top_y2, z_top_y2 = x_s, np.full(n, y_e[1]), z_top_l
+            x_top_y1 = x_s
+            y_top_y1 = np.full(n, y_e[0])
+            z_top_y1 = z_top_l
+            
+            x_top_y2 = x_s
+            y_top_y2 = np.full(n, y_e[1])
+            z_top_y2 = z_top_l
+            
             # Κόμβοι πυθμένα (Y = -10 και Y = 10)
-            x_bot_y1, y_bot_y1, z_bot_y1 = x_s, np.full(n, y_e[0]), z_bot_l
-            x_bot_y2, y_bot_y2, z_bot_y2 = x_s, np.full(n, y_e[1]), z_bot_l
+            x_bot_y1 = x_s
+            y_bot_y1 = np.full(n, y_e[0])
+            z_bot_y1 = z_bot_l
+            
+            x_bot_y2 = x_s
+            y_bot_y2 = np.full(n, y_e[1])
+            z_bot_y2 = z_bot_l
             
             x_nodes = np.concatenate([x_top_y1, x_top_y2, x_bot_y1, x_bot_y2])
             y_nodes = np.concatenate([y_top_y1, y_top_y2, y_bot_y1, y_bot_y2])
-            z_nodes = np.concatenate([z_top_l, z_top_l, z_bot_l, z_bot_l])
+            z_nodes = np.concatenate([z_top_y1, z_top_y2, z_bot_y1, z_bot_y2])
             return x_nodes, y_nodes, z_nodes
 
         fig_3d = go.Figure()
         
-        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΣΥΜΠΑΓΕΙΣ ΚΑΜΠΥΛΩΤΕΣ ΟΓΚΟΥΣ ΜΕ MESH3D ---
+        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΣΥΜΠΑΓΕΙΣ ΚΑΜΠΥΛΩΤΕΣ ΟΓΚΟΥΣ ΜΕ MESH3D (Διορθώθηκαν όλες οι κλήσεις συναρτήσεων) ---
         
         # Στρώση 1: Μαλακή Άργιλος / Ιλύς (CL/ML) - Καφέ
         x_m1, y_m1, z_m1 = create_curved_mesh(x_space, y_edges, z_surf_line, z_l1_line)
@@ -117,7 +128,7 @@ if uploaded_file is not None:
             name='Συμπιεστή Άργιλος (CH/MH)', legendgroup='g2', showlegend=True
         ))
         
-        # Στρώση 3: Σκληρή Μάζα (Stiff Marl) - Γκρι (Αλλάχθηκε το όνομα από Μάργα σε Σκληρή Μάζα)
+        # Στρώση 3: Σκληρή Μάζα (Stiff Marl) - Γκρι
         x_m3, y_m3, z_m3 = create_curved_mesh(x_space, y_edges, z_l2_line, z_bot_line)
         fig_3d.add_trace(go.Mesh3d(
             x=x_m3, y=y_m3, z=z_m3, color='#a9a9a9', opacity=0.45, alphahull=0,
@@ -192,7 +203,7 @@ if uploaded_file is not None:
         st.subheader("📦 Τρισδιάστατο Συμπαγές & Διαφανές Μοντέλο (Με δυνατότητα Τομής)")
         st.plotly_chart(fig_3d, use_container_width=True)
         
-        # 3. 2D ΔΙΑΓΡΑΜΜΑΤΑ
+        # 3. 2D ΔΙΑΓΡΑΜΜΑΤΑ (Διορθώθηκε η άνω-κάτω τελεία στο else:)
         st.markdown("---")
         st.subheader("📈 Συγκριτικά Προφίλ Ιδιοτήτων με το Βάθος")
         
@@ -239,4 +250,5 @@ if uploaded_file is not None:
             
     except Exception as e:
         st.error(f"⚠️ Σφάλμα κατά την επεξεργασία: {e}")
-else
+else:
+    st.info("💡 Η εφαρμογή είναι έτοιμη. Ανεβάστε το νέο αρχείο Excel για να δημιουργηθεί το μοντέλο.")
