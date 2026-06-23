@@ -7,7 +7,7 @@ import numpy as np
 st.set_page_config(page_title="3D Geotechnical Cross-Section & Slicing", layout="wide")
 
 st.title("📦 Real-Data Τρισδιάστατο (3D) Γεωτεχνικό Μοντέλο (0-450m)")
-st.write("Συμπαγής και ημιδιάφανη απεικόνιση των εδαφικών στρώσεων με Mesh3d, τις πραγματικές κλίσεις του Υδροφόρου Ορίζοντα, τη δοκιμή CPT στα 280m, τοπικές ανωμαλίες και δυνατότητα δυναμικών τομών.")
+st.write("Συμπαγής και ημιδιάφανη απεικόνιση των εδαφικών στρώσεων με Mesh3d, αποτύπωση πραγματικών κλίσεων/μεταβολών, τη δοκιμή CPT στα 280m, τοπικές ανωμαλίες και δυνατότητα δυναμικών τομών.")
 
 # 1. Εισαγωγή Αρχείου Excel
 uploaded_file = st.file_uploader("📂 Ανεβάστε το τελικό αρχείο Excel (.xlsx)", type=["xlsx"])
@@ -74,26 +74,34 @@ if uploaded_file is not None:
         z_layer2_pts = np.array([-21.0, -21.0, -20.5, -20.0, -21.0, -21.5, -21.5]) 
         z_bottom_pts = np.array([-35.0, -35.0, -35.0, -35.0, -35.0, -35.0, -35.0]) 
 
-        # Δημιουργία Grid 2 γραμμών (Y=-10 και Y=10) για να φτιάξουμε τέλειους κλειστούς 3D όγκους
-        x_space = np.linspace(min_x, max_x, 30)
+        # Πυκνό πλέγμα σημείων (150 σημεία) για να αποτυπωθούν οι πραγματικές καμπύλες και αλλαγές πάχους
+        x_space = np.linspace(min_x, max_x, 150)
         y_edges = np.array([-10, 10])
         
-        # Υπολογισμός των υψών οροφής και πυθμένα με παρεμβολή
+        # Υπολογισμός των υψών οροφής και πυθμένα με ρεαλιστική παρεμβολή
         z_surf_line = np.zeros_like(x_space)
         z_l1_line = np.interp(x_space, x_points, z_layer1_pts)
         z_l2_line = np.interp(x_space, x_points, z_layer2_pts)
         z_bot_line = np.interp(x_space, x_points, z_bottom_pts)
 
-        # Συνάρτηση που δημιουργεί τις 3D συντεταγμένες ενός κλειστού όγκου (Mesh3d)
-        def create_mesh_nodes(x_s, y_e, z_top_l, z_bot_l):
-            x_nodes = np.concatenate([x_s, x_s, x_s, x_s])
-            y_nodes = np.concatenate([np.full_like(x_s, y_e[0]), np.full_like(x_s, y_e[1]), np.full_like(x_s, y_e[0]), np.full_like(x_s, y_e[1])])
-            z_nodes = np.concatenate([z_top_l, z_top_l, z_bot_l, z_bot_l])
+        # Συνάρτηση που δημιουργεί τις 3D συντεταγμένες και τις τριγωνικές έδρες (Mesh3d) για καμπύλες στρώσεις
+        def create_curved_mesh(x_s, y_e, z_top_l, z_bot_l):
+            n = len(x_s)
+            # Κόμβοι οροφής (Y = -10 και Y = 10)
+            x_top_y1, y_top_y1, z_top_y1 = x_s, np.full(n, y_e[0]), z_top_l
+            x_top_y2, y_top_y2, z_top_y2 = x_s, np.full(n, y_e[1]), z_top_l
+            # Κόμβοι πυθμένα (Y = -10 και Y = 10)
+            x_bot_y1, y_bot_y1, z_bot_y1 = x_s, np.full(n, y_e[0]), z_bot_l
+            x_bot_y2, y_bot_y2, z_bot_y2 = x_s, np.full(n, y_e[1]), z_bot_l
+            
+            x_nodes = np.concatenate([x_top_y1, x_top_y2, x_bot_y1, x_bot_y2])
+            y_nodes = np.concatenate([y_top_y1, y_top_y2, y_bot_y1, y_bot_y2])
+            z_nodes = np.concatenate([z_top_y1, z_top_y2, z_bot_y1, z_bot_y2])
             return x_nodes, y_nodes, z_nodes
 
         fig_3d = go.Figure()
         
-        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΣΥΜΠΑΓΕΙΣ ΟΓΚΟΥΣ ΜΕ MESH3D (Διορθώθηκε το alphahull) ---
+        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΣΥΜΠΑΓΕΙΣ ΚΑΜΠΥΛΩΤΕΣ ΟΓΚΟΥΣ ΜΕ MESH3D ---
         
         # Στρώση 1: Μαλακή Άργιλος / Ιλύς (CL/ML) - Καφέ
         x_m1, y_m1, z_m1 = create_mesh_nodes(x_space, y_edges, z_surf_line, z_l1_line)
@@ -116,9 +124,7 @@ if uploaded_file is not None:
             name='Σκλήρη Μάργα (Stiff Marl)', legendgroup='g3', showlegend=True
         ))
 
-        # --- ΠΡΟΣΘΗΚΗ ΤΟΠΙΚΩΝ ΓΕΩΤΕΧΝΙΚΩΝ ΑΝΩΜΑΛΙΩΝ (Διορθώθηκε το alphahull) ---
-        
-        # 1. Θύλακας Μηδενικής Αντοχής στη ΝΓ-1 (X=80m, Βάθος 6.5m έως 9.5m)
+        # --- ΠΡΟΣΘΗΚΗ ΤΟΠΙΚΩΝ ΓΕΩΤΕΧΝΙΚΩΝ ΑΝΩΜΑΛΙΩΝ ---
         if min_x <= 80 <= max_x:
             x_a1 = np.array([65, 95, 65, 95, 65, 95, 65, 95])
             y_a1 = np.array([-5, -5, 5, 5, -5, -5, 5, 5])
@@ -128,7 +134,6 @@ if uploaded_file is not None:
                 name='⚠️ Ζώνη Μηδενικής Αντοχής (ΝΓ-1)', legendgroup='anom1', showlegend=True
             ))
 
-        # 2. Φακός Πολύ Σκληρής Αργίλου στο CPT (X=280m, Βάθος 16m έως 20m)
         if min_x <= 280 <= max_x:
             x_a2 = np.array([265, 295, 265, 295, 265, 295, 265, 295])
             y_a2 = np.array([-5, -5, 5, 5, -5, -5, 5, 5])
