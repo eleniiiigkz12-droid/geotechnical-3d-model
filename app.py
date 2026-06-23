@@ -82,26 +82,24 @@ if uploaded_file is not None:
                 name='Σκλήρη Μάργα (Stiff Marl)', legendgroup='g3', showlegend=bool(offset==0)
             ))
 
-        # --- ΠΡΟΣΘΗΚΗ ΤΟΠΙΚΩΝ ΓΕΩΤΕΧΝΙΚΩΝ ΑΝΩΜΑΛΙΩΝ (FAULTS/LENSES) ---
+        # --- ΠΡΟΣΘΗΚΗ ΤΟΠΙΚΩΝ ΓΕΩΤΕΧΝΙΚΩΝ ΑΝΩΜΑΛΙΩΝ (Με διόρθωση bool) ---
         
         # 1. Θύλακας Μηδενικής Αντοχής στη ΝΓ-1 (X=80m, Βάθος 6.5m έως 9.5m)
-        # Δημιουργούμε ένα μικρό συμπαγές κόκκινο κουτί γύρω από τη γεώτρηση
         x_anom1, y_anom1 = np.meshgrid(np.linspace(65, 95, 5), np.linspace(-5, 5, 3))
-        for z_val in np.linspace(-9.5, -6.5, 4):
+        for idx, z_val in enumerate(np.linspace(-9.5, -6.5, 4)):
             fig_3d.add_trace(go.Surface(
                 x=x_anom1, y=y_anom1, z=np.full_like(x_anom1, z_val),
                 colorscale=[[0, '#ff4d4d'], [1, '#ff4d4d']], opacity=0.8, showscale=False,
-                name='⚠️ Ζώνη Μηδενικής Αντοχής (ΝΓ-1)', legendgroup='anom1', showlegend=(z_val==-9.5)
+                name='⚠️ Ζώνη Μηδενικής Αντοχής (ΝΓ-1)', legendgroup='anom1', showlegend=bool(idx==0)
             ))
 
         # 2. Φακός Πολύ Σκληρής Αργίλου στο CPT (X=280m, Βάθος 16m έως 20m)
-        # Δημιουργούμε ένα συμπαγές πράσινο/πορτοκαλί κουτί γύρω από το CPT
         x_anom2, y_anom2 = np.meshgrid(np.linspace(265, 295, 5), np.linspace(-5, 5, 3))
-        for z_val in np.linspace(-20.0, -16.0, 4):
+        for idx, z_val in enumerate(np.linspace(-20.0, -16.0, 4)):
             fig_3d.add_trace(go.Surface(
                 x=x_anom2, y=y_anom2, z=np.full_like(x_anom2, z_val),
                 colorscale=[[0, '#2ecc71'], [1, '#2ecc71']], opacity=0.8, showscale=False,
-                name='💪 Φακός Υψηλής Αντοχής (CPT)', legendgroup='anom2', showlegend=(z_val==-20.0)
+                name='💪 Φακός Υψηλής Αντοχής (CPT)', legendgroup='anom2', showlegend=bool(idx==0)
             ))
 
         # --- ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ ---
