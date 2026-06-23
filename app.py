@@ -17,38 +17,37 @@ if uploaded_file is not None:
         # Ανάγνωση των δεδομένων
         df = pd.read_excel(uploaded_file)
         
-        # ΑΥΣΤΗΡΟΣ ΚΑΘΑΡΙΣΜΟΣ ΣΤΗΛΩΝ: Αφαιρεί όλα τα διπλά/περιττά κενά για να ταιριάζει με το Excel
+        # Καθαρισμός στηλών από κενά στην αρχή και στο τέλος
         df.columns = [col.strip() for col in df.columns]
         
-        # Ομαλοποίηση των ονομάτων στηλών για να αποφευχθούν προβλήματα με κενά
+        # ΕΞΥΠΝΗ ΟΜΑΛΟΠΟΙΗΣΗ ΣΤΗΛΩΝ (Βασισμένη σε λέξεις-κλειδιά για αποφυγή KeyError)
         column_mapping = {}
         for col in df.columns:
-            normalized = "".join(col.split()) # Αφαιρεί όλα τα κενά για τη σύγκριση
-            if "TestID" in normalized:
+            col_lower = col.lower()
+            if "test" in col_lower and "id" in col_lower:
                 column_mapping[col] = "Test ID"
-            elif "Xcoordination" in normalized:
+            elif "x-coordin" in col_lower or "x coordin" in col_lower:
                 column_mapping[col] = "X-coordination"
-            elif "Depth" in normalized:
+            elif "depth" in col_lower:
                 column_mapping[col] = "Depth"
-            elif "Ncorrected" in normalized:
+            elif "n-correct" in col_lower or "n correct" in col_lower:
                 column_mapping[col] = "N-corrected"
-            elif "SufromSPT" in normalized:
+            elif "spt" in col_lower:
                 column_mapping[col] = "Su(from SPT)"
-            elif "SufromVs" in normalized:
-                column_mapping[col] = "Su (from Vs)"
-            elif "VsfromCPT" in normalized:
-                column_mapping[col] = "Vs (from CPT-qc)"
-            elif "SufromCPT" in normalized:
+            elif "cpt" in col_lower and "su" in col_lower:
                 column_mapping[col] = "Su (from CPT-qc)"
-            elif col == "Vs":
+            elif "cpt" in col_lower and "vs" in col_lower:
+                column_mapping[col] = "Vs (from CPT-qc)"
+            elif "vs" in col_lower and "su" in col_lower:
+                column_mapping[col] = "Su (from Vs)"
+            elif col_lower == "vs":
                 column_mapping[col] = "Vs"
                 
         df = df.rename(columns=column_mapping)
             
-        # Μετατροπή όλων των αριθμητικών στηλών σε float
-        fixed_cols = ['X-coordination', 'Depth', 'N-corrected', 'Su(from SPT)', 'Vs', 'Su (from Vs)', 'Vs (from CPT-qc)', 'Su (from CPT-qc)']
-        for col in fixed_cols:
-            if col in df.columns:
+        # Μετατροπή των στηλών που υπάρχουν όντως στο DataFrame
+        for col in df.columns:
+            if col in ['X-coordination', 'Depth', 'N-corrected', 'Su(from SPT)', 'Vs', 'Su (from Vs)', 'Vs (from CPT-qc)', 'Su (from CPT-qc)']:
                 if df[col].dtype == object:
                     df[col] = df[col].astype(str).str.replace(',', '.', regex=False)
                 df[col] = pd.to_numeric(df[col], errors='coerce')
@@ -89,7 +88,7 @@ if uploaded_file is not None:
 
         fig_3d = go.Figure()
         
-        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΗΜΙΔΙΑΦΑΝΟΙ ΣΥΜΠΑΓΕΙΣ ΟΓΚΟΥΣ (ΔΙΟΡΘΩΜΕΝΑ ΔΙΠΛΑ brackets) ---
+        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΗΜΙΔΙΑΦΑΝΟΙ ΣΥΜΠΑΓΕΙΣ ΟΓΚΟΥΣ ---
         for offset in np.linspace(0, 1, 6):
             Z_fill = Z_surface * (1 - offset) + Z_layer1 * offset
             fig_3d.add_trace(go.Surface(
@@ -114,7 +113,7 @@ if uploaded_file is not None:
                 name='Σκλήρη Μάργα (Stiff Marl)', legendgroup='g3', showlegend=bool(offset==0)
             ))
 
-        # --- ΠΡΟΣΘΗΚΗ ΤΟΠΙΚΩΝ ΓΕΩΤΕΧΝΙΚΩΝ ΑΝΩΜΑΛΙΩΝ (ΔΙΟΡΘΩΜΕΝΑ ΔΙΠΛΑ brackets) ---
+        # --- ΠΡΟΣΘΗΚΗ ΤΟΠΙΚΩΝ ΓΕΩΤΕΧΝΙΚΩΝ ΑΝΩΜΑΛΙΩΝ ---
         if min_x <= 80 <= max_x:
             x_anom1, y_anom1 = np.meshgrid(np.linspace(max(min_x, 65), min(max_x, 95), 5), np.linspace(-5, 5, 3))
             for idx, z_val in enumerate(np.linspace(-9.5, -6.5, 4)):
@@ -193,13 +192,15 @@ if uploaded_file is not None:
         with col1:
             fig_vs = go.Figure()
             if 'CPT' in str(selected_test):
-                cpt_vs_data = test_data.dropna(subset=['Vs (from CPT-qc)'])
-                if not cpt_vs_data.empty:
-                    fig_vs.add_trace(go.Scatter(x=cpt_vs_data['Vs (from CPT-qc)'], y=-cpt_vs_data['Depth'], mode='lines+markers', name='Vs από CPT-qc (m/s)', line=dict(color='darkcyan', width=3)))
+                if 'Vs (from CPT-qc)' in test_data.columns:
+                    cpt_vs_data = test_data.dropna(subset=['Vs (from CPT-qc)'])
+                    if not cpt_vs_data.empty:
+                        fig_vs.add_trace(go.Scatter(x=cpt_vs_data['Vs (from CPT-qc)'], y=-cpt_vs_data['Depth'], mode='lines+markers', name='Vs από CPT-qc (m/s)', line=dict(color='darkcyan', width=3)))
             else:
-                masw_vs_data = test_data.dropna(subset=['Vs'])
-                if not masw_vs_data.empty:
-                    fig_vs.add_trace(go.Scatter(x=masw_vs_data['Vs'], y=-masw_vs_data['Depth'], mode='lines+markers', name='Vs από MASW (m/s)', line=dict(color='blue', width=3)))
+                if 'Vs' in test_data.columns:
+                    masw_vs_data = test_data.dropna(subset=['Vs'])
+                    if not masw_vs_data.empty:
+                        fig_vs.add_trace(go.Scatter(x=masw_vs_data['Vs'], y=-masw_vs_data['Depth'], mode='lines+markers', name='Vs από MASW (m/s)', line=dict(color='blue', width=3)))
             
             fig_vs.update_layout(title=f"Κατανομή Ταχύτητας Vs - {selected_test}", xaxis=dict(title="Vs (m/s)"), yaxis=dict(title="Βάθος (m)"), template="plotly_white")
             st.plotly_chart(fig_vs, use_container_width=True)
@@ -207,17 +208,20 @@ if uploaded_file is not None:
         with col2:
             fig_su = go.Figure()
             if 'CPT' in str(selected_test):
-                cpt_su_data = test_data.dropna(subset=['Su (from CPT-qc)'])
-                if not cpt_su_data.empty:
-                    fig_su.add_trace(go.Scatter(x=cpt_su_data['Su (from CPT-qc)'], y=-cpt_su_data['Depth'], mode='lines+markers', name='Su από CPT-qc (kPa)', line=dict(color='red', width=3)))
+                if 'Su (from CPT-qc)' in test_data.columns:
+                    cpt_su_data = test_data.dropna(subset=['Su (from CPT-qc)'])
+                    if not cpt_su_data.empty:
+                        fig_su.add_trace(go.Scatter(x=cpt_su_data['Su (from CPT-qc)'], y=-cpt_su_data['Depth'], mode='lines+markers', name='Su από CPT-qc (kPa)', line=dict(color='red', width=3)))
             else:
-                spt_su_data = test_data.dropna(subset=['Su(from SPT)'])
-                if not spt_su_data.empty:
-                    fig_su.add_trace(go.Scatter(x=spt_su_data['Su(from SPT)'], y=-spt_su_data['Depth'], mode='lines+markers', name='Su (από SPT)', line=dict(color='green', width=2)))
+                if 'Su(from SPT)' in test_data.columns:
+                    spt_su_data = test_data.dropna(subset=['Su(from SPT)'])
+                    if not spt_su_data.empty:
+                        fig_su.add_trace(go.Scatter(x=spt_su_data['Su(from SPT)'], y=-spt_su_data['Depth'], mode='lines+markers', name='Su (από SPT)', line=dict(color='green', width=2)))
                 
-                vs_su_data = test_data.dropna(subset=['Su (from Vs)'])
-                if not vs_su_data.empty:
-                    fig_su.add_trace(go.Scatter(x=vs_su_data['Su (from Vs)'], y=-vs_su_data['Depth'], mode='lines+markers', name='Su (από Vs)', line=dict(color='purple', dash='dash', width=2)))
+                if 'Su (from Vs)' in test_data.columns:
+                    vs_su_data = test_data.dropna(subset=['Su (from Vs)'])
+                    if not vs_su_data.empty:
+                        fig_su.add_trace(go.Scatter(x=vs_su_data['Su (from Vs)'], y=-vs_su_data['Depth'], mode='lines+markers', name='Su (από Vs)', line=dict(color='purple', dash='dash', width=2)))
                 
             fig_su.update_layout(title=f"Κατανομή Διατμητικής Αντοχής Su - {selected_test}", xaxis=dict(title="Su (kPa)"), yaxis=dict(title="Βάθος (m)"), template="plotly_white")
             st.plotly_chart(fig_su, use_container_width=True)
