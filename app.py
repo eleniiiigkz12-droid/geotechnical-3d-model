@@ -133,7 +133,7 @@ if uploaded_file is not None:
                     name='💪 Φακός Υψηλής Αντοχής (CPT)', legendgroup='anom2', showlegend=bool(idx==0)
                 ))
 
-        # --- ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ ---
+        # --- ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ (Διορθωμένο χωρίς διπλό name) ---
         w_mask = (x_points >= min_x) & (x_points <= max_x)
         if np.any(w_mask):
             fig_3d.add_trace(go.Scatter3d(
@@ -141,7 +141,6 @@ if uploaded_file is not None:
                 mode='lines+markers+text',
                 line=dict(color='rgb(0, 80, 255)', width=12),
                 marker=dict(size=8, color='darkblue', symbol='diamond'),
-                name='Υδροφόρος Ορίζοντας',
                 text=["💧 ΥΔΡΟΦΟΡΟΣ" if i == len(x_points[w_mask])//2 else "" for i in range(len(x_points[w_mask]))],
                 textposition="top center",
                 name="Υδροφόρος Ορίζοντας"
@@ -183,7 +182,7 @@ if uploaded_file is not None:
         st.subheader("📦 Τρισδιάστατο Συμπαγές & Διαφανές Μοντέλο (Με δυνατότητα Τομής)")
         st.plotly_chart(fig_3d, use_container_width=True)
         
-        # 3. 2D ΔΙΑΓΡΑΜΜΑΤΑ (ΔΙΟΡΘΩΜΕΝΑ ΚΑΙ ΠΛΗΡΗ)
+        # 3. 2D ΔΙΑΓΡΑΜΜΑΤΑ
         st.markdown("---")
         st.subheader("📈 Συγκριτικά Προφίλ Ιδιοτήτων με το Βάθος")
         
@@ -193,11 +192,9 @@ if uploaded_file is not None:
         col1, col2 = st.columns(2)
         with col1:
             fig_vs = go.Figure()
-            # Αν επιλεγεί το CPT, σχεδιάζει το Vs από το CPT-qc
             if 'CPT' in str(selected_test):
                 if 'Vs (from CPT-qc)' in test_data.columns and test_data['Vs (from CPT-qc)'].notna().any():
                     fig_vs.add_trace(go.Scatter(x=test_data['Vs (from CPT-qc)'], y=-test_data['Depth'], mode='lines+markers', name='Vs από CPT-qc (m/s)', line=dict(color='darkcyan', width=3)))
-            # Αν επιλεγεί Γεώτρηση, σχεδιάζει το κανονικό Vs (MASW)
             else:
                 if 'Vs' in test_data.columns and test_data['Vs'].notna().any():
                     fig_vs.add_trace(go.Scatter(x=test_data['Vs'], y=-test_data['Depth'], mode='lines+markers', name='Vs από MASW (m/s)', line=dict(color='blue', width=3)))
@@ -207,11 +204,9 @@ if uploaded_file is not None:
             
         with col2:
             fig_su = go.Figure()
-            # Αν επιλεγεί το CPT, δείχνει το Su από το CPT-qc
             if 'CPT' in str(selected_test):
                 if 'Su (from CPT-qc)' in test_data.columns and test_data['Su (from CPT-qc)'].notna().any():
                     fig_su.add_trace(go.Scatter(x=test_data['Su (from CPT-qc)'], y=-test_data['Depth'], mode='lines+markers', name='Su από CPT-qc', line=dict(color='red', width=3)))
-            # Αν επιλεγεί Γεώτρηση, δείχνει τα Su από SPT και Vs
             else:
                 if 'Su(from SPT)' in test_data.columns and test_data['Su(from SPT)'].notna().any():
                     fig_su.add_trace(go.Scatter(x=test_data['Su(from SPT)'], y=-test_data['Depth'], mode='lines+markers', name='Su (από SPT)', line=dict(color='green', width=2)))
