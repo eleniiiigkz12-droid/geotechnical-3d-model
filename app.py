@@ -101,7 +101,7 @@ if uploaded_file is not None:
 
         fig_3d = go.Figure()
         
-        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΣΥΜΠΑΓΕΙΣ ΚΑΜΠΥΛΩΤΕΣ ΟΓΚΟΥΣ ΜΕ MESH3D (Διορθώθηκε το όνομα της συνάρτησης) ---
+        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΣΥΜΠΑΓΕΙΣ ΚΑΜΠΥΛΩΤΕΣ ΟΓΚΟΥΣ ΜΕ MESH3D ---
         
         # Στρώση 1: Μαλακή Άργιλος / Ιλύς (CL/ML) - Καφέ
         x_m1, y_m1, z_m1 = create_curved_mesh(x_space, y_edges, z_surf_line, z_l1_line)
@@ -117,11 +117,11 @@ if uploaded_file is not None:
             name='Συμπιεστή Άργιλος (CH/MH)', legendgroup='g2', showlegend=True
         ))
         
-        # Στρώση 3: Σκληρή Μάργα (Stiff Marl) - Γκρι
+        # Στρώση 3: Σκληρή Μάζα (Stiff Marl) - Γκρι (Αλλάχθηκε το όνομα από Μάργα σε Σκληρή Μάζα)
         x_m3, y_m3, z_m3 = create_curved_mesh(x_space, y_edges, z_l2_line, z_bot_line)
         fig_3d.add_trace(go.Mesh3d(
             x=x_m3, y=y_m3, z=z_m3, color='#a9a9a9', opacity=0.45, alphahull=0,
-            name='Σκλήρη Μάργα (Stiff Marl)', legendgroup='g3', showlegend=True
+            name='Σκλήρη Μάζα (Stiff Marl)', legendgroup='g3', showlegend=True
         ))
 
         # --- ΠΡΟΣΘΗΚΗ ΤΟΠΙΚΩΝ ΓΕΩΤΕΧΝΙΚΩΝ ΑΝΩΜΑΛΙΩΝ ---
@@ -239,5 +239,4 @@ if uploaded_file is not None:
             
     except Exception as e:
         st.error(f"⚠️ Σφάλμα κατά την επεξεργασία: {e}")
-else:
-    st.info("💡 Η εφαρμογή είναι έτοιμη. Ανεβάστε το νέο αρχείο Excel για να δημιουργηθεί το μοντέλο.")
+else
