@@ -93,30 +93,30 @@ if uploaded_file is not None:
 
         fig_3d = go.Figure()
         
-        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΣΥΜΠΑΓΕΙΣ ΟΓΚΟΥΣ ΜΕ MESH3D ---
+        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΣΥΜΠΑΓΕΙΣ ΟΓΚΟΥΣ ΜΕ MESH3D (Διορθώθηκε το alphahull) ---
         
         # Στρώση 1: Μαλακή Άργιλος / Ιλύς (CL/ML) - Καφέ
         x_m1, y_m1, z_m1 = create_mesh_nodes(x_space, y_edges, z_surf_line, z_l1_line)
         fig_3d.add_trace(go.Mesh3d(
-            x=x_m1, y=y_m1, z=z_m1, color='#d2b48c', opacity=0.45, Alphahull=0,
+            x=x_m1, y=y_m1, z=z_m1, color='#d2b48c', opacity=0.45, alphahull=0,
             name='Μαλακή Άργιλος / Ιλύς (CL/ML)', legendgroup='g1', showlegend=True
         ))
         
         # Στρώση 2: Συμπιεστή Άργιλος (CH/MH) - Κίτρινο
         x_m2, y_m2, z_m2 = create_mesh_nodes(x_space, y_edges, z_l1_line, z_l2_line)
         fig_3d.add_trace(go.Mesh3d(
-            x=x_m2, y=y_m2, z=z_m2, color='#ebdca5', opacity=0.45, Alphahull=0,
+            x=x_m2, y=y_m2, z=z_m2, color='#ebdca5', opacity=0.45, alphahull=0,
             name='Συμπιεστή Άργιλος (CH/MH)', legendgroup='g2', showlegend=True
         ))
         
         # Στρώση 3: Σκληρή Μάργα (Stiff Marl) - Γκρι
         x_m3, y_m3, z_m3 = create_mesh_nodes(x_space, y_edges, z_l2_line, z_bot_line)
         fig_3d.add_trace(go.Mesh3d(
-            x=x_m3, y=y_m3, z=z_m3, color='#a9a9a9', opacity=0.45, Alphahull=0,
+            x=x_m3, y=y_m3, z=z_m3, color='#a9a9a9', opacity=0.45, alphahull=0,
             name='Σκλήρη Μάργα (Stiff Marl)', legendgroup='g3', showlegend=True
         ))
 
-        # --- ΠΡΟΣΘΗΚΗ ΤΟΠΙΚΩΝ ΓΕΩΤΕΧΝΙΚΩΝ ΑΝΩΜΑΛΙΩΝ (ΩΣ ΠΛΗΡΩΣ ΣΥΜΠΑΓΗ ΚΟΥΤΙΑ) ---
+        # --- ΠΡΟΣΘΗΚΗ ΤΟΠΙΚΩΝ ΓΕΩΤΕΧΝΙΚΩΝ ΑΝΩΜΑΛΙΩΝ (Διορθώθηκε το alphahull) ---
         
         # 1. Θύλακας Μηδενικής Αντοχής στη ΝΓ-1 (X=80m, Βάθος 6.5m έως 9.5m)
         if min_x <= 80 <= max_x:
@@ -124,7 +124,7 @@ if uploaded_file is not None:
             y_a1 = np.array([-5, -5, 5, 5, -5, -5, 5, 5])
             z_a1 = np.array([-6.5, -6.5, -6.5, -6.5, -9.5, -9.5, -9.5, -9.5])
             fig_3d.add_trace(go.Mesh3d(
-                x=x_a1, y=y_a1, z=z_a1, color='#ff4d4d', opacity=0.85, Alphahull=0,
+                x=x_a1, y=y_a1, z=z_a1, color='#ff4d4d', opacity=0.85, alphahull=0,
                 name='⚠️ Ζώνη Μηδενικής Αντοχής (ΝΓ-1)', legendgroup='anom1', showlegend=True
             ))
 
@@ -134,7 +134,7 @@ if uploaded_file is not None:
             y_a2 = np.array([-5, -5, 5, 5, -5, -5, 5, 5])
             z_a2 = np.array([-16.0, -16.0, -16.0, -16.0, -20.0, -20.0, -20.0, -20.0])
             fig_3d.add_trace(go.Mesh3d(
-                x=x_a2, y=y_a2, z=z_a2, color='#2ecc71', opacity=0.85, Alphahull=0,
+                x=x_a2, y=y_a2, z=z_a2, color='#2ecc71', opacity=0.85, alphahull=0,
                 name='💪 Φακός Υψηλής Αντοχής (CPT)', legendgroup='anom2', showlegend=True
             ))
 
