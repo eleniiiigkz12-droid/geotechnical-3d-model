@@ -87,7 +87,6 @@ if uploaded_file is not None:
         # Συνάρτηση που δημιουργεί τις 3D συντεταγμένες για καμπύλες στρώσεις (Mesh3d)
         def create_curved_mesh(x_s, y_e, z_top_l, z_bot_l):
             n = len(x_s)
-            # Κόμβοι οροφής (Y = -10 και Y = 10)
             x_top_y1 = x_s
             y_top_y1 = np.full(n, y_e[0])
             z_top_y1 = z_top_l
@@ -96,7 +95,6 @@ if uploaded_file is not None:
             y_top_y2 = np.full(n, y_e[1])
             z_top_y2 = z_top_l
             
-            # Κόμβοι πυθμένα (Y = -10 και Y = 10)
             x_bot_y1 = x_s
             y_bot_y1 = np.full(n, y_e[0])
             z_bot_y1 = z_bot_l
@@ -112,7 +110,7 @@ if uploaded_file is not None:
 
         fig_3d = go.Figure()
         
-        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΣΥΜΠΑΓΕΙΣ ΚΑΜΠΥΛΩΤΕΣ ΟΓΚΟΥΣ ΜΕ MESH3D (Διορθώθηκαν όλες οι κλήσεις συναρτήσεων) ---
+        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΣΥΜΠΑΓΕΙΣ ΚΑΜΠΥΛΩΤΕΣ ΟΓΚΟΥΣ ΜΕ MESH3D ---
         
         # Στρώση 1: Μαλακή Άργιλος / Ιλύς (CL/ML) - Καφέ
         x_m1, y_m1, z_m1 = create_curved_mesh(x_space, y_edges, z_surf_line, z_l1_line)
@@ -128,11 +126,11 @@ if uploaded_file is not None:
             name='Συμπιεστή Άργιλος (CH/MH)', legendgroup='g2', showlegend=True
         ))
         
-        # Στρώση 3: Σκληρή Μάζα (Stiff Marl) - Γκρι
+        # Στρώση 3: Σκληρή Μάζα (Stiff Soil Mass) - Γκρι (Διορθώθηκε η μετάφραση σε Stiff Soil Mass)
         x_m3, y_m3, z_m3 = create_curved_mesh(x_space, y_edges, z_l2_line, z_bot_line)
         fig_3d.add_trace(go.Mesh3d(
             x=x_m3, y=y_m3, z=z_m3, color='#a9a9a9', opacity=0.45, alphahull=0,
-            name='Σκλήρη Μάζα (Stiff Marl)', legendgroup='g3', showlegend=True
+            name='Σκλήρη Μάζα (Stiff Soil Mass)', legendgroup='g3', showlegend=True
         ))
 
         # --- ΠΡΟΣΘΗΚΗ ΤΟΠΙΚΩΝ ΓΕΩΤΕΧΝΙΚΩΝ ΑΝΩΜΑΛΙΩΝ ---
@@ -184,71 +182,4 @@ if uploaded_file is not None:
                     marker=dict(size=6, color='darkred'),
                     text=[str(t_id), ""],
                     textposition="top center",
-                    name=str(t_id),
-                    showlegend=False
-                ))
-            
-        fig_3d.update_layout(
-            scene=dict(
-                xaxis=dict(title='Μήκος Χ (m)', range=[min_x, max_x]),
-                yaxis=dict(title='Πλάτος Υ (m)', range=[-10, 10]),
-                zaxis=dict(title='Βάθος Ζ (m)', range=[-35, 5]),
-                aspectratio=dict(x=3, y=1, z=2.2)
-            ),
-            height=700,
-            margin=dict(r=10, l=10, b=10, t=10),
-            legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
-        )
-        
-        st.subheader("📦 Τρισδιάστατο Συμπαγές & Διαφανές Μοντέλο (Με δυνατότητα Τομής)")
-        st.plotly_chart(fig_3d, use_container_width=True)
-        
-        # 3. 2D ΔΙΑΓΡΑΜΜΑΤΑ (Διορθώθηκε η άνω-κάτω τελεία στο else:)
-        st.markdown("---")
-        st.subheader("📈 Συγκριτικά Προφίλ Ιδιοτήτων με το Βάθος")
-        
-        selected_test = st.selectbox("🎯 Επιλέξτε Γεώτρηση ή Δοκιμή:", df['Test ID'].dropna().unique())
-        test_data = df[df['Test ID'] == selected_test].sort_values(by='Depth')
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            fig_vs = go.Figure()
-            if 'CPT' in str(selected_test):
-                if 'Vs (from CPT-qc)' in test_data.columns:
-                    cpt_vs_data = test_data.dropna(subset=['Vs (from CPT-qc)'])
-                    if not cpt_vs_data.empty:
-                        fig_vs.add_trace(go.Scatter(x=cpt_vs_data['Vs (from CPT-qc)'], y=-cpt_vs_data['Depth'], mode='lines+markers', name='Vs από CPT-qc (m/s)', line=dict(color='darkcyan', width=3)))
-            else:
-                if 'Vs' in test_data.columns:
-                    masw_vs_data = test_data.dropna(subset=['Vs'])
-                    if not masw_vs_data.empty:
-                        fig_vs.add_trace(go.Scatter(x=masw_vs_data['Vs'], y=-masw_vs_data['Depth'], mode='lines+markers', name='Vs από MASW (m/s)', line=dict(color='blue', width=3)))
-            
-            fig_vs.update_layout(title=f"Κατανομή Ταχύτητας Vs - {selected_test}", xaxis=dict(title="Vs (m/s)"), yaxis=dict(title="Βάθος (m)"), template="plotly_white")
-            st.plotly_chart(fig_vs, use_container_width=True)
-            
-        with col2:
-            fig_su = go.Figure()
-            if 'CPT' in str(selected_test):
-                if 'Su (from CPT-qc)' in test_data.columns:
-                    cpt_su_data = test_data.dropna(subset=['Su (from CPT-qc)'])
-                    if not cpt_su_data.empty:
-                        fig_su.add_trace(go.Scatter(x=cpt_su_data['Su (from CPT-qc)'], y=-cpt_su_data['Depth'], mode='lines+markers', name='Su από CPT-qc (kPa)', line=dict(color='red', width=3)))
-            else:
-                if 'Su(from SPT)' in test_data.columns:
-                    spt_su_data = test_data.dropna(subset=['Su(from SPT)'])
-                    if not spt_su_data.empty:
-                        fig_su.add_trace(go.Scatter(x=spt_su_data['Su(from SPT)'], y=-spt_su_data['Depth'], mode='lines+markers', name='Su (από SPT)', line=dict(color='green', width=2)))
-                
-                if 'Su (from Vs)' in test_data.columns:
-                    vs_su_data = test_data.dropna(subset=['Su (from Vs)'])
-                    if not vs_su_data.empty:
-                        fig_su.add_trace(go.Scatter(x=vs_su_data['Su (from Vs)'], y=-vs_su_data['Depth'], mode='lines+markers', name='Su (από Vs)', line=dict(color='purple', dash='dash', width=2)))
-                
-            fig_su.update_layout(title=f"Κατανομή Διατμητικής Αντοχής Su - {selected_test}", xaxis=dict(title="Su (kPa)"), yaxis=dict(title="Βάθος (m)"), template="plotly_white")
-            st.plotly_chart(fig_su, use_container_width=True)
-            
-    except Exception as e:
-        st.error(f"⚠️ Σφάλμα κατά την επεξεργασία: {e}")
-else:
-    st.info("💡 Η εφαρμογή είναι έτοιμη. Ανεβάστε το νέο αρχείο Excel για να δημιουργηθεί το μοντέλο.")
+                    name=str(t_id
