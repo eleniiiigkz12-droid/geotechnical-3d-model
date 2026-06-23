@@ -7,7 +7,7 @@ import numpy as np
 st.set_page_config(page_title="3D Geotechnical Cross-Section", layout="wide")
 
 st.title("📦 Real-Data Τρισδιάστατο (3D) Γεωτεχνικό Μοντέλο (0-450m)")
-st.write("Συμπαγής και ημιδιάφανη απεικόνιση των εδαφικών στρώσεων με τις πραγματικές κλίσεις του Υδροφόρου Ορίζοντα και ενσωμάτωση δοκιμής CPT στα 280m.")
+st.write("Συμπαγής και ημιδιάφανη απεικόνιση των εδαφικών στρώσεων με τις πραγματικές κλίσεις του Υδροφόρου Ορίζοντα, τη δοκιμή CPT στα 280m και τις τοπικές γεωτεχνικές ανωμαλίες.")
 
 # 1. Εισαγωγή Αρχείου Excel
 uploaded_file = st.file_uploader("📂 Ανεβάστε το τελικό αρχείο Excel (.xlsx)", type=["xlsx"])
@@ -32,9 +32,8 @@ if uploaded_file is not None:
         st.success("Το αρχείο φορτώθηκε επιτυχώς!")
         
         # Πραγματικά γεωλογικά δεδομένα και νέα ύψη υδροφόρου ανά γεώτρηση/δοκιμή
-        # Θέσεις Χ: ΝΓ1=80m, Γ1=180m, ΓΕ1=250m, CPT=280m, ΝΓ2=350m (με προσθήκη των άκρων 0m και 450m)
         x_points = np.array([0, 80, 180, 250, 280, 350, 450])
-        z_water_pts = np.array([-1.20, -1.20, -0.30, -0.90, -0.75, -0.60, -0.60]) # Το CPT παίρνει μέσο όρο -0.75μ
+        z_water_pts = np.array([-1.20, -1.20, -0.30, -0.90, -0.75, -0.60, -0.60]) 
         
         # Όρια στρώσεων βάσει των γεωτρήσεων και της νέας δοκιμής CPT στα 280m
         z_layer1_pts = np.array([-9.5, -9.5, -8.5, -8.0, -10.0, -11.5, -11.5])  
@@ -61,7 +60,7 @@ if uploaded_file is not None:
             Z_fill = Z_surface * (1 - offset) + Z_layer1 * offset
             fig_3d.add_trace(go.Surface(
                 x=X_grid, y=Y_grid, z=Z_fill,
-                colorscale=[[0, '#d2b48c'], [1, '#d2b48c']], opacity=0.35, showscale=False,
+                colorscale=[[0, '#d2b48c'], [1, '#d2b48c']], opacity=0.30, showscale=False,
                 name='Μαλακή Άργιλος / Ιλύς (CL/ML)', legendgroup='g1', showlegend=bool(offset==0)
             ))
         
@@ -70,7 +69,7 @@ if uploaded_file is not None:
             Z_fill = Z_layer1 * (1 - offset) + Z_layer2 * offset
             fig_3d.add_trace(go.Surface(
                 x=X_grid, y=Y_grid, z=Z_fill,
-                colorscale=[[0, '#ebdca5'], [1, '#ebdca5']], opacity=0.35, showscale=False,
+                colorscale=[[0, '#ebdca5'], [1, '#ebdca5']], opacity=0.30, showscale=False,
                 name='Συμπιεστή Άργιλος (CH/MH)', legendgroup='g2', showlegend=bool(offset==0)
             ))
         
@@ -79,11 +78,33 @@ if uploaded_file is not None:
             Z_fill = Z_layer2 * (1 - offset) + Z_bottom * offset
             fig_3d.add_trace(go.Surface(
                 x=X_grid, y=Y_grid, z=Z_fill,
-                colorscale=[[0, '#a9a9a9'], [1, '#a9a9a9']], opacity=0.35, showscale=False,
+                colorscale=[[0, '#a9a9a9'], [1, '#a9a9a9']], opacity=0.30, showscale=False,
                 name='Σκλήρη Μάργα (Stiff Marl)', legendgroup='g3', showlegend=bool(offset==0)
             ))
 
-        # --- ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ (Με το σημείο CPT στα 280m) ---
+        # --- ΠΡΟΣΘΗΚΗ ΤΟΠΙΚΩΝ ΓΕΩΤΕΧΝΙΚΩΝ ΑΝΩΜΑΛΙΩΝ (FAULTS/LENSES) ---
+        
+        # 1. Θύλακας Μηδενικής Αντοχής στη ΝΓ-1 (X=80m, Βάθος 6.5m έως 9.5m)
+        # Δημιουργούμε ένα μικρό συμπαγές κόκκινο κουτί γύρω από τη γεώτρηση
+        x_anom1, y_anom1 = np.meshgrid(np.linspace(65, 95, 5), np.linspace(-5, 5, 3))
+        for z_val in np.linspace(-9.5, -6.5, 4):
+            fig_3d.add_trace(go.Surface(
+                x=x_anom1, y=y_anom1, z=np.full_like(x_anom1, z_val),
+                colorscale=[[0, '#ff4d4d'], [1, '#ff4d4d']], opacity=0.8, showscale=False,
+                name='⚠️ Ζώνη Μηδενικής Αντοχής (ΝΓ-1)', legendgroup='anom1', showlegend=(z_val==-9.5)
+            ))
+
+        # 2. Φακός Πολύ Σκληρής Αργίλου στο CPT (X=280m, Βάθος 16m έως 20m)
+        # Δημιουργούμε ένα συμπαγές πράσινο/πορτοκαλί κουτί γύρω από το CPT
+        x_anom2, y_anom2 = np.meshgrid(np.linspace(265, 295, 5), np.linspace(-5, 5, 3))
+        for z_val in np.linspace(-20.0, -16.0, 4):
+            fig_3d.add_trace(go.Surface(
+                x=x_anom2, y=y_anom2, z=np.full_like(x_anom2, z_val),
+                colorscale=[[0, '#2ecc71'], [1, '#2ecc71']], opacity=0.8, showscale=False,
+                name='💪 Φακός Υψηλής Αντοχής (CPT)', legendgroup='anom2', showlegend=(z_val==-20.0)
+            ))
+
+        # --- ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ ---
         fig_3d.add_trace(go.Scatter3d(
             x=[80, 180, 250, 280, 350], 
             y=[0, 0, 0, 0, 0],
@@ -106,7 +127,6 @@ if uploaded_file is not None:
             x_pos = row['X-coordination']
             max_depth = df[df['Test ID'] == t_id]['Depth'].max()
             
-            # Το CPT θα σχεδιαστεί με μπλε/γαλάζιο χρώμα για να ξεχωρίζει οπτικά
             line_color = 'darkblue' if 'CPT' in str(t_id) else 'black'
             
             fig_3d.add_trace(go.Scatter3d(
@@ -144,10 +164,8 @@ if uploaded_file is not None:
         col1, col2 = st.columns(2)
         with col1:
             fig_vs = go.Figure()
-            # Σχεδίαση Vs από MASW (γεωτρήσεις)
             if 'Vs' in test_data.columns and test_data['Vs'].notna().any():
                 fig_vs.add_trace(go.Scatter(x=test_data['Vs'], y=-test_data['Depth'], mode='lines+markers', name='Vs από MASW (m/s)', line=dict(color='blue')))
-            # Σχεδίαση Vs από CPT-qc (νέα στήλη)
             if 'Vs (from CPT-qc)' in test_data.columns and test_data['Vs (from CPT-qc)'].notna().any():
                 fig_vs.add_trace(go.Scatter(x=test_data['Vs (from CPT-qc)'], y=-test_data['Depth'], mode='lines+markers', name='Vs από CPT-qc (m/s)', line=dict(color='darkcyan', dash='dash')))
                 
@@ -159,8 +177,7 @@ if uploaded_file is not None:
             if 'Su(from SPT)' in test_data.columns and test_data['Su(from SPT)'].notna().any():
                 fig_su.add_trace(go.Scatter(x=test_data['Su(from SPT)'], y=-test_data['Depth'], mode='lines+markers', name='Su (από SPT)', line=dict(color='green')))
             if 'Su (from Vs)' in test_data.columns and test_data['Su (from Vs)'].notna().any():
-                fig_su.add_trace(go.Scatter(x=test_data['Su (from Vs)'], y=-test_data['Depth'], mode='lines+markers', name='Su (από Vs)', line=dict(color='purple', dash='dash'))).strip()
-            # Σχεδίαση Su από CPT-qc (νέα στήλη)
+                fig_su.add_trace(go.Scatter(x=test_data['Su (from Vs)'], y=-test_data['Depth'], mode='lines+markers', name='Su (από Vs)', line=dict(color='purple', dash='dash')))
             if 'Su (from CPT-qc)' in test_data.columns and test_data['Su (from CPT-qc)'].notna().any():
                 fig_su.add_trace(go.Scatter(x=test_data['Su (from CPT-qc)'], y=-test_data['Depth'], mode='lines+markers', name='Su (από CPT-qc)', line=dict(color='red')))
                 
