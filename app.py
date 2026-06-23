@@ -89,7 +89,7 @@ if uploaded_file is not None:
 
         fig_3d = go.Figure()
         
-        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΗΜΙΔΙΑΦΑΝΟΙ ΣΥΜΠΑΓΕΙΣ ΟΓΚΟΥΣ ---
+        # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΗΜΙΔΙΑΦΑΝΟΙ ΣΥΜΠΑΓΕΙΣ ΟΓΚΟΥΣ (ΔΙΟΡΘΩΜΕΝΑ ΔΙΠΛΑ brackets) ---
         for offset in np.linspace(0, 1, 6):
             Z_fill = Z_surface * (1 - offset) + Z_layer1 * offset
             fig_3d.add_trace(go.Surface(
@@ -114,7 +114,7 @@ if uploaded_file is not None:
                 name='Σκλήρη Μάργα (Stiff Marl)', legendgroup='g3', showlegend=bool(offset==0)
             ))
 
-        # --- ΠΡΟΣΘΗΚΗ ΤΟΠΙΚΩΝ ΓΕΩΤΕΧΝΙΚΩΝ ΑΝΩΜΑΛΙΩΝ ---
+        # --- ΠΡΟΣΘΗΚΗ ΤΟΠΙΚΩΝ ΓΕΩΤΕΧΝΙΚΩΝ ΑΝΩΜΑΛΙΩΝ (ΔΙΟΡΘΩΜΕΝΑ ΔΙΠΛΑ brackets) ---
         if min_x <= 80 <= max_x:
             x_anom1, y_anom1 = np.meshgrid(np.linspace(max(min_x, 65), min(max_x, 95), 5), np.linspace(-5, 5, 3))
             for idx, z_val in enumerate(np.linspace(-9.5, -6.5, 4)):
@@ -133,7 +133,7 @@ if uploaded_file is not None:
                     name='💪 Φακός Υψηλής Αντοχής (CPT)', legendgroup='anom2', showlegend=bool(idx==0)
                 ))
 
-        # --- ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ (Διορθωμένο χωρίς διπλό name) ---
+        # --- ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ ---
         w_mask = (x_points >= min_x) & (x_points <= max_x)
         if np.any(w_mask):
             fig_3d.add_trace(go.Scatter3d(
@@ -193,11 +193,13 @@ if uploaded_file is not None:
         with col1:
             fig_vs = go.Figure()
             if 'CPT' in str(selected_test):
-                if 'Vs (from CPT-qc)' in test_data.columns and test_data['Vs (from CPT-qc)'].notna().any():
-                    fig_vs.add_trace(go.Scatter(x=test_data['Vs (from CPT-qc)'], y=-test_data['Depth'], mode='lines+markers', name='Vs από CPT-qc (m/s)', line=dict(color='darkcyan', width=3)))
+                cpt_vs_data = test_data.dropna(subset=['Vs (from CPT-qc)'])
+                if not cpt_vs_data.empty:
+                    fig_vs.add_trace(go.Scatter(x=cpt_vs_data['Vs (from CPT-qc)'], y=-cpt_vs_data['Depth'], mode='lines+markers', name='Vs από CPT-qc (m/s)', line=dict(color='darkcyan', width=3)))
             else:
-                if 'Vs' in test_data.columns and test_data['Vs'].notna().any():
-                    fig_vs.add_trace(go.Scatter(x=test_data['Vs'], y=-test_data['Depth'], mode='lines+markers', name='Vs από MASW (m/s)', line=dict(color='blue', width=3)))
+                masw_vs_data = test_data.dropna(subset=['Vs'])
+                if not masw_vs_data.empty:
+                    fig_vs.add_trace(go.Scatter(x=masw_vs_data['Vs'], y=-masw_vs_data['Depth'], mode='lines+markers', name='Vs από MASW (m/s)', line=dict(color='blue', width=3)))
             
             fig_vs.update_layout(title=f"Κατανομή Ταχύτητας Vs - {selected_test}", xaxis=dict(title="Vs (m/s)"), yaxis=dict(title="Βάθος (m)"), template="plotly_white")
             st.plotly_chart(fig_vs, use_container_width=True)
@@ -205,13 +207,17 @@ if uploaded_file is not None:
         with col2:
             fig_su = go.Figure()
             if 'CPT' in str(selected_test):
-                if 'Su (from CPT-qc)' in test_data.columns and test_data['Su (from CPT-qc)'].notna().any():
-                    fig_su.add_trace(go.Scatter(x=test_data['Su (from CPT-qc)'], y=-test_data['Depth'], mode='lines+markers', name='Su από CPT-qc', line=dict(color='red', width=3)))
+                cpt_su_data = test_data.dropna(subset=['Su (from CPT-qc)'])
+                if not cpt_su_data.empty:
+                    fig_su.add_trace(go.Scatter(x=cpt_su_data['Su (from CPT-qc)'], y=-cpt_su_data['Depth'], mode='lines+markers', name='Su από CPT-qc (kPa)', line=dict(color='red', width=3)))
             else:
-                if 'Su(from SPT)' in test_data.columns and test_data['Su(from SPT)'].notna().any():
-                    fig_su.add_trace(go.Scatter(x=test_data['Su(from SPT)'], y=-test_data['Depth'], mode='lines+markers', name='Su (από SPT)', line=dict(color='green', width=2)))
-                if 'Su (from Vs)' in test_data.columns and test_data['Su (from Vs)'].notna().any():
-                    fig_su.add_trace(go.Scatter(x=test_data['Su (from Vs)'], y=-test_data['Depth'], mode='lines+markers', name='Su (από Vs)', line=dict(color='purple', dash='dash', width=2)))
+                spt_su_data = test_data.dropna(subset=['Su(from SPT)'])
+                if not spt_su_data.empty:
+                    fig_su.add_trace(go.Scatter(x=spt_su_data['Su(from SPT)'], y=-spt_su_data['Depth'], mode='lines+markers', name='Su (από SPT)', line=dict(color='green', width=2)))
+                
+                vs_su_data = test_data.dropna(subset=['Su (from Vs)'])
+                if not vs_su_data.empty:
+                    fig_su.add_trace(go.Scatter(x=vs_su_data['Su (from Vs)'], y=-vs_su_data['Depth'], mode='lines+markers', name='Su (από Vs)', line=dict(color='purple', dash='dash', width=2)))
                 
             fig_su.update_layout(title=f"Κατανομή Διατμητικής Αντοχής Su - {selected_test}", xaxis=dict(title="Su (kPa)"), yaxis=dict(title="Βάθος (m)"), template="plotly_white")
             st.plotly_chart(fig_su, use_container_width=True)
