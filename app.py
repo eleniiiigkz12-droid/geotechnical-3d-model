@@ -17,11 +17,35 @@ if uploaded_file is not None:
         # Ανάγνωση των δεδομένων
         df = pd.read_excel(uploaded_file)
         
-        # Καθαρισμός στηλών μόνο από κενά δεξιά-αριστερά
+        # ΑΥΣΤΗΡΟΣ ΚΑΘΑΡΙΣΜΟΣ ΣΤΗΛΩΝ: Αφαιρεί όλα τα διπλά/περιττά κενά για να ταιριάζει με το Excel
+        df.columns = [col.strip() for col in df.columns]
+        
+        # Ομαλοποίηση των ονομάτων στηλών για να αποφευχθούν προβλήματα με κενά
+        column_mapping = {}
         for col in df.columns:
-            df = df.rename(columns={col: col.strip()})
+            normalized = "".join(col.split()) # Αφαιρεί όλα τα κενά για τη σύγκριση
+            if "TestID" in normalized:
+                column_mapping[col] = "Test ID"
+            elif "Xcoordination" in normalized:
+                column_mapping[col] = "X-coordination"
+            elif "Depth" in normalized:
+                column_mapping[col] = "Depth"
+            elif "Ncorrected" in normalized:
+                column_mapping[col] = "N-corrected"
+            elif "SufromSPT" in normalized:
+                column_mapping[col] = "Su(from SPT)"
+            elif "SufromVs" in normalized:
+                column_mapping[col] = "Su (from Vs)"
+            elif "VsfromCPT" in normalized:
+                column_mapping[col] = "Vs (from CPT-qc)"
+            elif "SufromCPT" in normalized:
+                column_mapping[col] = "Su (from CPT-qc)"
+            elif col == "Vs":
+                column_mapping[col] = "Vs"
+                
+        df = df.rename(columns=column_mapping)
             
-        # Μετατροπή όλων των αριθμητικών στηλών με βάση τα νέα ονόματα του Excel σου
+        # Μετατροπή όλων των αριθμητικών στηλών σε float
         fixed_cols = ['X-coordination', 'Depth', 'N-corrected', 'Su(from SPT)', 'Vs', 'Su (from Vs)', 'Vs (from CPT-qc)', 'Su (from CPT-qc)']
         for col in fixed_cols:
             if col in df.columns:
@@ -35,7 +59,6 @@ if uploaded_file is not None:
         st.sidebar.header("✂️ Εργαλεία Γεωτεχνικής Τομής")
         enable_slice = st.sidebar.checkbox("Ενεργοποίηση Δυναμικής Τομής", value=False)
         
-        # Slider επιλογής του εύρους του άξονα Χ που θα εμφανίζεται
         slice_range = st.sidebar.slider(
             "Επιλέξτε τμήμα χάραξης για εμφάνιση (m):",
             min_value=0, max_value=450, value=(0, 450), step=10
@@ -57,7 +80,7 @@ if uploaded_file is not None:
         y_space = np.linspace(-10, 10, 5)
         X_grid, Y_grid = np.meshgrid(x_space, y_space)
         
-        # Παρεμβολή (Interpolation) στα νέα όρια
+        # Παρεμβολή (Interpolation)
         Z_surface = np.zeros_like(X_grid)
         Z_water = np.tile(np.interp(x_space, x_points, z_water_pts), (len(y_space), 1))
         Z_layer1 = np.tile(np.interp(x_space, x_points, z_layer1_pts), (len(y_space), 1))
@@ -67,7 +90,6 @@ if uploaded_file is not None:
         fig_3d = go.Figure()
         
         # --- ΣΧΕΔΙΑΣΗ ΣΤΡΩΣΕΩΝ ΩΣ ΗΜΙΔΙΑΦΑΝΟΙ ΣΥΜΠΑΓΕΙΣ ΟΓΚΟΥΣ ---
-        # Στρώση 1: Μαλακή Άργιλος / Ιλύς (CL/ML)
         for offset in np.linspace(0, 1, 6):
             Z_fill = Z_surface * (1 - offset) + Z_layer1 * offset
             fig_3d.add_trace(go.Surface(
@@ -76,7 +98,6 @@ if uploaded_file is not None:
                 name='Μαλακή Άργιλος / Ιλύς (CL/ML)', legendgroup='g1', showlegend=bool(offset==0)
             ))
         
-        # Στρώση 2: Συμπιεστή Άργιλος (CH/MH)
         for offset in np.linspace(0, 1, 6):
             Z_fill = Z_layer1 * (1 - offset) + Z_layer2 * offset
             fig_3d.add_trace(go.Surface(
@@ -85,7 +106,6 @@ if uploaded_file is not None:
                 name='Συμπιεστή Άργιλος (CH/MH)', legendgroup='g2', showlegend=bool(offset==0)
             ))
         
-        # Στρώση 3: Σκληρή Μάργα (Stiff Marl)
         for offset in np.linspace(0, 1, 6):
             Z_fill = Z_layer2 * (1 - offset) + Z_bottom * offset
             fig_3d.add_trace(go.Surface(
@@ -94,9 +114,7 @@ if uploaded_file is not None:
                 name='Σκλήρη Μάργα (Stiff Marl)', legendgroup='g3', showlegend=bool(offset==0)
             ))
 
-        # --- ΠΡΟΣΘΗΚΗ ΤΟΠΙΚΩΝ ΓΕΩΤΕΧΝΙΚΩΝ ΑΝΩΜΑΛΙΩΝ (Εμφανίζονται μόνο αν είναι εντός των ορίων της τομής) ---
-        
-        # 1. Θύλακας Μηδενικής Αντοχής στη ΝΓ-1 (X=80m)
+        # --- ΠΡΟΣΘΗΚΗ ΤΟΠΙΚΩΝ ΓΕΩΤΕΧΝΙΚΩΝ ΑΝΩΜΑΛΙΩΝ ---
         if min_x <= 80 <= max_x:
             x_anom1, y_anom1 = np.meshgrid(np.linspace(max(min_x, 65), min(max_x, 95), 5), np.linspace(-5, 5, 3))
             for idx, z_val in enumerate(np.linspace(-9.5, -6.5, 4)):
@@ -106,7 +124,6 @@ if uploaded_file is not None:
                     name='⚠️ Ζώνη Μηδενικής Αντοχής (ΝΓ-1)', legendgroup='anom1', showlegend=bool(idx==0)
                 ))
 
-        # 2. Φακός Πολύ Σκληρής Αργίλου στο CPT (X=280m)
         if min_x <= 280 <= max_x:
             x_anom2, y_anom2 = np.meshgrid(np.linspace(max(min_x, 265), min(max_x, 295), 5), np.linspace(-5, 5, 3))
             for idx, z_val in enumerate(np.linspace(-20.0, -16.0, 4)):
@@ -116,34 +133,30 @@ if uploaded_file is not None:
                     name='💪 Φακός Υψηλής Αντοχής (CPT)', legendgroup='anom2', showlegend=bool(idx==0)
                 ))
 
-        # --- ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ (Φιλτράρισμα σημείων βάσει τομής) ---
+        # --- ΥΔΡΟΦΟΡΟΣ ΟΡΙΖΟΝΤΑΣ ---
         w_mask = (x_points >= min_x) & (x_points <= max_x)
         if np.any(w_mask):
             fig_3d.add_trace(go.Scatter3d(
-                x=x_points[w_mask], 
-                y=[0] * np.sum(w_mask),
-                z=z_water_pts[w_mask],
+                x=x_points[w_mask], y=[0] * np.sum(w_mask), z=z_water_pts[w_mask],
                 mode='lines+markers+text',
                 line=dict(color='rgb(0, 80, 255)', width=12),
                 marker=dict(size=8, color='darkblue', symbol='diamond'),
                 name='Υδροφόρος Ορίζοντας',
                 text=["💧 ΥΔΡΟΦΟΡΟΣ" if i == len(x_points[w_mask])//2 else "" for i in range(len(x_points[w_mask]))],
                 textposition="top center",
-                textfont=dict(size=15, color="darkblue")
+                name="Υδροφόρος Ορίζοντας"
             ))
         
-        # Σχεδιασμός Κατακόρυφων Γεωτρήσεων & CPT (Φιλτράρισμα βάσει τομής)
+        # Σχεδιασμός Κατακόρυφων Γεωτρήσεων & CPT
         df_clean = df.dropna(subset=['Test ID', 'X-coordination'])
         unique_tests = df_clean[['Test ID', 'X-coordination']].drop_duplicates()
         
         for idx, row in unique_tests.iterrows():
             t_id = row['Test ID']
             x_pos = row['X-coordination']
-            
             if min_x <= x_pos <= max_x:
                 max_depth = df[df['Test ID'] == t_id]['Depth'].max()
                 line_color = 'darkblue' if 'CPT' in str(t_id) else 'black'
-                
                 fig_3d.add_trace(go.Scatter3d(
                     x=[x_pos, x_pos], y=[0, 0], z=[0, -max_depth],
                     mode='lines+markers+text',
@@ -170,31 +183,40 @@ if uploaded_file is not None:
         st.subheader("📦 Τρισδιάστατο Συμπαγές & Διαφανές Μοντέλο (Με δυνατότητα Τομής)")
         st.plotly_chart(fig_3d, use_container_width=True)
         
-        # 3. 2D Διαγράμματα
+        # 3. 2D ΔΙΑΓΡΑΜΜΑΤΑ (ΔΙΟΡΘΩΜΕΝΑ ΚΑΙ ΠΛΗΡΗ)
         st.markdown("---")
         st.subheader("📈 Συγκριτικά Προφίλ Ιδιοτήτων με το Βάθος")
+        
         selected_test = st.selectbox("🎯 Επιλέξτε Γεώτρηση ή Δοκιμή:", df['Test ID'].dropna().unique())
         test_data = df[df['Test ID'] == selected_test].sort_values(by='Depth')
         
         col1, col2 = st.columns(2)
         with col1:
             fig_vs = go.Figure()
-            if 'Vs' in test_data.columns and test_data['Vs'].notna().any():
-                fig_vs.add_trace(go.Scatter(x=test_data['Vs'], y=-test_data['Depth'], mode='lines+markers', name='Vs από MASW (m/s)', line=dict(color='blue')))
-            if 'Vs (from CPT-qc)' in test_data.columns and test_data['Vs (from CPT-qc)'].notna().any():
-                fig_vs.add_trace(go.Scatter(x=test_data['Vs (from CPT-qc)'], y=-test_data['Depth'], mode='lines+markers', name='Vs από CPT-qc (m/s)', line=dict(color='darkcyan', dash='dash')))
-                
+            # Αν επιλεγεί το CPT, σχεδιάζει το Vs από το CPT-qc
+            if 'CPT' in str(selected_test):
+                if 'Vs (from CPT-qc)' in test_data.columns and test_data['Vs (from CPT-qc)'].notna().any():
+                    fig_vs.add_trace(go.Scatter(x=test_data['Vs (from CPT-qc)'], y=-test_data['Depth'], mode='lines+markers', name='Vs από CPT-qc (m/s)', line=dict(color='darkcyan', width=3)))
+            # Αν επιλεγεί Γεώτρηση, σχεδιάζει το κανονικό Vs (MASW)
+            else:
+                if 'Vs' in test_data.columns and test_data['Vs'].notna().any():
+                    fig_vs.add_trace(go.Scatter(x=test_data['Vs'], y=-test_data['Depth'], mode='lines+markers', name='Vs από MASW (m/s)', line=dict(color='blue', width=3)))
+            
             fig_vs.update_layout(title=f"Κατανομή Ταχύτητας Vs - {selected_test}", xaxis=dict(title="Vs (m/s)"), yaxis=dict(title="Βάθος (m)"), template="plotly_white")
             st.plotly_chart(fig_vs, use_container_width=True)
             
         with col2:
             fig_su = go.Figure()
-            if 'Su(from SPT)' in test_data.columns and test_data['Su(from SPT)'].notna().any():
-                fig_su.add_trace(go.Scatter(x=test_data['Su(from SPT)'], y=-test_data['Depth'], mode='lines+markers', name='Su (από SPT)', line=dict(color='green')))
-            if 'Su (from Vs)' in test_data.columns and test_data['Su (from Vs)'].notna().any():
-                fig_su.add_trace(go.Scatter(x=test_data['Su (from Vs)'], y=-test_data['Depth'], mode='lines+markers', name='Su (από Vs)', line=dict(color='purple', dash='dash')))
-            if 'Su (from CPT-qc)' in test_data.columns and test_data['Su (from CPT-qc)'].notna().any():
-                fig_su.add_trace(go.Scatter(x=test_data['Su (from CPT-qc)'], y=-test_data['Depth'], mode='lines+markers', name='Su (από CPT-qc)', line=dict(color='red')))
+            # Αν επιλεγεί το CPT, δείχνει το Su από το CPT-qc
+            if 'CPT' in str(selected_test):
+                if 'Su (from CPT-qc)' in test_data.columns and test_data['Su (from CPT-qc)'].notna().any():
+                    fig_su.add_trace(go.Scatter(x=test_data['Su (from CPT-qc)'], y=-test_data['Depth'], mode='lines+markers', name='Su από CPT-qc', line=dict(color='red', width=3)))
+            # Αν επιλεγεί Γεώτρηση, δείχνει τα Su από SPT και Vs
+            else:
+                if 'Su(from SPT)' in test_data.columns and test_data['Su(from SPT)'].notna().any():
+                    fig_su.add_trace(go.Scatter(x=test_data['Su(from SPT)'], y=-test_data['Depth'], mode='lines+markers', name='Su (από SPT)', line=dict(color='green', width=2)))
+                if 'Su (from Vs)' in test_data.columns and test_data['Su (from Vs)'].notna().any():
+                    fig_su.add_trace(go.Scatter(x=test_data['Su (from Vs)'], y=-test_data['Depth'], mode='lines+markers', name='Su (από Vs)', line=dict(color='purple', dash='dash', width=2)))
                 
             fig_su.update_layout(title=f"Κατανομή Διατμητικής Αντοχής Su - {selected_test}", xaxis=dict(title="Su (kPa)"), yaxis=dict(title="Βάθος (m)"), template="plotly_white")
             st.plotly_chart(fig_su, use_container_width=True)
